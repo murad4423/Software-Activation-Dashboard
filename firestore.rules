@@ -1,0 +1,15 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // The C# app never talks to Firestore directly - it only calls the Netlify
+    // Functions, which use the Admin SDK (service account) and therefore bypass
+    // these rules entirely. These rules exist only to gate the dashboard's direct
+    // reads to your one admin account.
+    match /{document=**} {
+      allow read: if request.auth != null
+                   && request.auth.token.email == "mdmuradsorkar26@gmail.com";
+      allow write: if false; // all writes happen server-side via the Admin SDK
+    }
+  }
+}

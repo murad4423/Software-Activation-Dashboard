@@ -1,0 +1,31 @@
+[build]
+  command = "npm run build"
+  publish = "dist"
+  functions = "netlify/functions"
+
+[functions]
+  node_bundler = "esbuild"
+
+# These make the deployed site match ActivationApiClient.cs exactly, so the C# app's
+# BaseUrl can just be "https://your-subdomain.yoursite.com" with no other changes -
+# e.g. BaseUrl + "/activateTrial" resolves here instead of needing "/.netlify/functions/activate-trial".
+[[redirects]]
+  from = "/activateTrial"
+  to = "/.netlify/functions/activate-trial"
+  status = 200
+
+[[redirects]]
+  from = "/requestFinalActivation"
+  to = "/.netlify/functions/request-final-activation"
+  status = 200
+
+[[redirects]]
+  from = "/checkFinalActivation"
+  to = "/.netlify/functions/check-final-activation"
+  status = 200
+
+# SPA fallback for the React dashboard (client-side routing)
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
