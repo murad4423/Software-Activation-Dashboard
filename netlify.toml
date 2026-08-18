@@ -24,6 +24,14 @@
   to = "/.netlify/functions/check-final-activation"
   status = 200
 
+# Public, no-login endpoint the phone-facing "/activate" page calls after someone
+# scans the Offline-Activation QR code. Trial-issuance only (see the function file
+# for why Final requests are always rejected here).
+[[redirects]]
+  from = "/activateOfflineTrial"
+  to = "/.netlify/functions/activate-offline-trial"
+  status = 200
+
 # SPA fallback for the React dashboard (client-side routing)
 [[redirects]]
   from = "/*"
