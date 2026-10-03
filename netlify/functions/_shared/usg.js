@@ -30,12 +30,21 @@ const STATUS_CODES = { trial: 1, active: 2, expired: 3, suspended: 4 };
 
 const base64url = (buffer) => Buffer.from(buffer).toString('base64').replace(/=+$/, '').replace(/\+/g, '-').replace(/\//g, '_');
 
+/**
+ * The PEM text from USG_LICENSE_PRIVATE_KEY, repaired if pasting lost its line breaks: a value pasted into a
+ * one-line field often arrives with spaces or literal "\n" instead of newlines, which crypto can't read.
+ */
 function privateKeyPem() {
-  const pem = process.env.USG_LICENSE_PRIVATE_KEY;
-  if (!pem) {
+  const raw = (process.env.USG_LICENSE_PRIVATE_KEY || '').replace(/\\n/g, '\n').trim();
+  if (!raw) {
     throw new Error('USG_LICENSE_PRIVATE_KEY env var is not set (PEM text of the USG ECDSA P-256 private key).');
   }
-  return pem.includes('\\n') ? pem.replace(/\\n/g, '\n') : pem;
+  const m = /-----BEGIN ([A-Z ]+)-----([\s\S]*?)-----END \1-----/.exec(raw);
+  if (!m) {
+    throw new Error('USG_LICENSE_PRIVATE_KEY is not a PEM key: it must contain the -----BEGIN ... PRIVATE KEY----- and -----END ... PRIVATE KEY----- lines.');
+  }
+  const body = m[2].replace(/[^A-Za-z0-9+/=]/g, '');
+  return `-----BEGIN ${m[1]}-----\n${body.match(/.{1,64}/g).join('\n')}\n-----END ${m[1]}-----\n`;
 }
 
 /** ES256 JWT. The signature is the raw 64-byte r||s ("ieee-p1363"), as JWT requires. */
