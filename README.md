@@ -147,3 +147,44 @@ change.
   (mentioned as a "could also do this" in the original plan) isn't implemented —
   say the word if you want one hospital blocked from requesting multiple trials
   under different machines too.
+
+---
+
+# USG Reporting app (second software, same site)
+
+The same site, Firebase project and admin login also run the **USG Reporting** desktop app. The dashboard has a
+**SMRG | USG** switch at the top. Nothing of the SMRG system was changed: its functions, routes, RSA key and
+Firestore collections (`devices`, `activationRequests`) are untouched.
+
+Everything for USG lives under **`/usg/`** (see `netlify.toml`):
+
+| Address | Function | Used by |
+|---|---|---|
+| `POST /usg/api/activate` | `usg-activate.js` | app: online activation (new PC = trial, known PC = its licence) |
+| `POST /usg/api/sync` | `usg-sync.js` | app: every 12 h, picks up renewals / suspensions |
+| `POST /usg/api/dev-reset-request` | `usg-dev-reset-request.js` | app: hidden dev reset (only recorded) |
+| `/usg/activate?r=...` + `POST /usg/api/offline-activate` | `src/usg/UsgActivatePage.jsx`, `usg-offline-activate.js` | phone, from the app's QR code |
+| `POST /usg/api/update` | `usg-update.js` | app: Check for Updates |
+| `GET /usg/api/update/download?asset=` | `usg-update-download.js` | app: download (redirect to GitHub) |
+| `/.netlify/functions/usg-admin` | `usg-admin.js` | dashboard (admin login required) |
+
+Contract with the app: `Software Code/docs/LICENSE_SERVER_API.md`.
+
+Firestore (all new, `usg*`): `usgDevices`, `usgResetRequests`, `usgEvents`, `usgConfig` (settings, counters, updates),
+`usgRateLimits`, `usgDeletedDevices`. The existing `firestore.rules` already restricts reads to the admin account.
+
+## Extra Netlify environment variables (the existing ones stay as they are)
+
+| Key | Value |
+|---|---|
+| `USG_LICENSE_PRIVATE_KEY` | text of `C:\Users\user\Documents\USG-License-Keys\license-private-key.pem` (ECDSA, NOT the SMRG RSA key) |
+| `USG_GITHUB_OWNER` | GitHub account that holds the USG releases repo |
+| `USG_GITHUB_REPO` | that repository's name (may be private) |
+| `USG_GITHUB_TOKEN` | fine-grained token, only that repo, permission "Contents: Read-only" |
+
+The **update-signing** private key is NOT put into Netlify — it stays on the developer PC (see
+`Software Code/docs/LICENSE_DEVELOPER_NOTES.md`, "Releasing an update").
+
+## Firestore TTL (optional, keeps the database small)
+
+Firebase Console → Firestore → TTL policies → collection `usgRateLimits`, field `expiresAt`.
