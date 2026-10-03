@@ -18,7 +18,7 @@
 //   usgConfig/updates          { releasedVersion, paused, testDevices: [fingerprint] }
 //   usgRateLimits/{key}        request counters
 
-import { createPrivateKey, sign } from 'node:crypto';
+import { createPrivateKey, createPublicKey, sign } from 'node:crypto';
 import { getAdmin } from './firebaseAdmin.js';
 
 // ----- licence signing (copied from tools/make-license.mjs) -----
@@ -34,17 +34,46 @@ const base64url = (buffer) => Buffer.from(buffer).toString('base64').replace(/=+
  * The PEM text from USG_LICENSE_PRIVATE_KEY, repaired if pasting lost its line breaks: a value pasted into a
  * one-line field often arrives with spaces or literal "\n" instead of newlines, which crypto can't read.
  */
+const WRONG_KEY_HELP = 'Put the full text of license-private-key.pem (USG-License-Keys folder) into USG_LICENSE_PRIVATE_KEY, then redeploy.';
+/** The licence PUBLIC key built into the app (LicenseToken.PublicKeySpki): the private key must belong to it. */
+const APP_LICENCE_PUBLIC_KEY =
+  'MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEitG5I1SHusf8B5On58jF45CY5EMVPZAq1dRww3qg3WSJivyCc5/TrIp7J4iETiWXlZyc/yg2beQtVFFsJszQEg==';
+let checkedKey = null;
+
+/**
+ * The licence private key from USG_LICENSE_PRIVATE_KEY, as a PEM string. Tolerates a paste that lost its line breaks
+ * or its BEGIN/END lines, and says exactly what is wrong when it is a public key or the wrong key.
+ */
 function privateKeyPem() {
   const raw = (process.env.USG_LICENSE_PRIVATE_KEY || '').replace(/\\n/g, '\n').trim();
-  if (!raw) {
-    throw new Error('USG_LICENSE_PRIVATE_KEY env var is not set (PEM text of the USG ECDSA P-256 private key).');
-  }
+  if (checkedKey && checkedKey.raw === raw) return checkedKey.pem;
+  if (!raw) throw new Error('USG_LICENSE_PRIVATE_KEY is not set. ' + WRONG_KEY_HELP);
+
   const m = /-----BEGIN ([A-Z ]+)-----([\s\S]*?)-----END \1-----/.exec(raw);
-  if (!m) {
-    throw new Error('USG_LICENSE_PRIVATE_KEY is not a PEM key: it must contain the -----BEGIN ... PRIVATE KEY----- and -----END ... PRIVATE KEY----- lines.');
+  const label = m ? m[1] : 'PRIVATE KEY';
+  const body = (m ? m[2] : raw).replace(/[^A-Za-z0-9+/=]/g, '');
+  if (/PUBLIC/.test(label)) throw new Error('USG_LICENSE_PRIVATE_KEY contains a PUBLIC key. ' + WRONG_KEY_HELP);
+
+  let key;
+  try {
+    key = createPrivateKey(`-----BEGIN ${label}-----\n${(body.match(/.{1,64}/g) || []).join('\n')}\n-----END ${label}-----\n`);
+  } catch {
+    let isPublic = false;
+    try {
+      createPublicKey({ key: Buffer.from(body, 'base64'), format: 'der', type: 'spki' });
+      isPublic = true;
+    } catch {
+      // neither
+    }
+    throw new Error(`USG_LICENSE_PRIVATE_KEY is ${isPublic ? 'a PUBLIC key (e.g. a *-public-key.txt file)' : 'not a readable private key (incomplete copy?)'}. ` + WRONG_KEY_HELP);
   }
-  const body = m[2].replace(/[^A-Za-z0-9+/=]/g, '');
-  return `-----BEGIN ${m[1]}-----\n${body.match(/.{1,64}/g).join('\n')}\n-----END ${m[1]}-----\n`;
+  const publicSpki = createPublicKey(key).export({ type: 'spki', format: 'der' }).toString('base64');
+  if (publicSpki !== APP_LICENCE_PUBLIC_KEY) {
+    throw new Error('USG_LICENSE_PRIVATE_KEY is a private key, but not the LICENCE key the app trusts (update-signing key?). ' + WRONG_KEY_HELP);
+  }
+  const pem = key.export({ type: 'pkcs8', format: 'pem' });
+  checkedKey = { raw, pem };
+  return pem;
 }
 
 /** ES256 JWT. The signature is the raw 64-byte r||s ("ieee-p1363"), as JWT requires. */
