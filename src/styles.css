@@ -169,3 +169,49 @@ code { background: var(--panel-alt); padding: 1px 5px; border-radius: 4px; font-
   .detail-panel { grid-template-columns: 1fr; padding-left: 20px; }
   .card-grid { grid-template-columns: 1fr; }
 }
+
+/* ----- product switch (SMRG | USG) ----- */
+.topbar-right { display: flex; align-items: center; gap: 10px; }
+.product-switch { display: flex; background: var(--panel-alt); border: 1px solid var(--border); border-radius: 9px; padding: 3px; }
+.product-switch button { background: transparent; color: var(--muted); padding: 6px 14px; border-radius: 7px; font-weight: 600; font-size: 13px; }
+.product-switch button.active { background: var(--accent); color: white; }
+
+/* ----- USG panel ----- */
+button.danger { background: var(--danger); }
+.usg-info {
+  color: var(--success); font-size: 13px; background: var(--success-soft);
+  border: 1px solid rgba(34, 197, 94, 0.35); padding: 8px 12px; border-radius: 8px; margin-bottom: 12px;
+}
+.usg-actions { padding: 4px 20px 20px 40px; display: flex; flex-direction: column; gap: 14px; }
+.usg-actions .card-actions { margin-top: 4px; }
+.usg-action-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.usg-action-group { display: flex; flex-direction: column; gap: 2px; }
+.usg-danger-zone { border-top: 1px solid var(--border); padding-top: 12px; }
+.card-actions input.usg-narrow { width: 90px; }
+.card-actions input.usg-mid { width: 160px; }
+.card-actions input.usg-wide { width: 280px; flex: 1; min-width: 200px; }
+.card-actions textarea { flex: 1; min-width: 240px; }
+.usg-check { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text); }
+.usg-check input { width: auto; }
+.usg-history { margin: 4px 0 0; padding-left: 18px; font-size: 13px; display: flex; flex-direction: column; gap: 4px; max-height: 220px; overflow-y: auto; }
+.usg-subhead { font-size: 14px; margin: 22px 0 10px; }
+.usg-stat-3 { grid-template-columns: repeat(3, 1fr); }
+.usg-two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+.usg-badge-gap { margin-left: 6px; }
+
+/* ----- /usg/activate (phone page) ----- */
+.usg-activate { padding: 16px; height: auto; min-height: 100vh; }
+.usg-activate-card { width: 100%; max-width: 420px; }
+.usg-activate-facts { display: flex; flex-direction: column; gap: 4px; word-break: break-word; }
+.usg-activate-status { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.usg-code {
+  font-family: "Cascadia Mono", Consolas, "Courier New", monospace; font-size: 20px; font-weight: 700; letter-spacing: 0.06em;
+  line-height: 1.6; text-align: center; word-break: break-all; background: var(--panel-alt); border: 1px solid var(--border);
+  border-radius: 10px; padding: 14px 10px; user-select: all;
+}
+
+@media (max-width: 720px) {
+  .topbar { flex-wrap: wrap; gap: 10px; }
+  .usg-actions { padding-left: 16px; padding-right: 16px; }
+  .usg-action-row, .usg-two-col, .usg-stat-3 { grid-template-columns: 1fr; }
+}
