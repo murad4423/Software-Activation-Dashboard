@@ -3,6 +3,7 @@ import { collection, onSnapshot, orderBy, query } from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
 import { auth, db } from './firebase';
 import { approveFinal, rejectRequest, issueOffline } from './api';
+import UsgPanel from './usg/UsgPanel.jsx';
 
 function fmtDate(ts) {
   if (!ts) return '—';
@@ -470,24 +471,13 @@ function usePendingCount() {
   return count;
 }
 
-export default function Dashboard() {
+// The SMRG app's tabs, exactly as before.
+function SmrgPanel() {
   const [tab, setTab] = useState('pending');
   const pendingCount = usePendingCount();
 
   return (
-    <div className="dashboard">
-      <header className="topbar">
-        <div className="brand">
-          <span className="brand-mark">SMRG</span>
-          <div>
-            <h1>License Admin</h1>
-            <span className="muted small">Hospital licensing &amp; activation control panel</span>
-          </div>
-        </div>
-        <button className="secondary" onClick={() => signOut(auth)}>
-          Sign out
-        </button>
-      </header>
+    <>
       <nav className="tabs">
         <button className={tab === 'pending' ? 'active' : ''} onClick={() => setTab('pending')}>
           Pending Activations
@@ -505,6 +495,60 @@ export default function Dashboard() {
         {tab === 'devices' && <DevicesTab />}
         {tab === 'offline' && <OfflineTab />}
       </main>
+    </>
+  );
+}
+
+const PRODUCTS = [
+  { key: 'smrg', mark: 'SMRG', name: 'Smart Medical Report Generator' },
+  { key: 'usg', mark: 'USG', name: 'USG Reporting' },
+];
+
+function readProduct() {
+  try {
+    return localStorage.getItem('dashboard.product') === 'usg' ? 'usg' : 'smrg';
+  } catch {
+    return 'smrg';
+  }
+}
+
+export default function Dashboard() {
+  const [product, setProduct] = useState(readProduct);
+  const current = PRODUCTS.find((p) => p.key === product);
+
+  function choose(key) {
+    setProduct(key);
+    try {
+      localStorage.setItem('dashboard.product', key);
+    } catch {
+      // only a convenience
+    }
+  }
+
+  return (
+    <div className="dashboard">
+      <header className="topbar">
+        <div className="brand">
+          <span className="brand-mark">{current.mark}</span>
+          <div>
+            <h1>License Admin</h1>
+            <span className="muted small">{current.name} · licensing, activation &amp; updates</span>
+          </div>
+        </div>
+        <div className="topbar-right">
+          <div className="product-switch" role="tablist" aria-label="Software">
+            {PRODUCTS.map((p) => (
+              <button key={p.key} role="tab" aria-selected={product === p.key} className={product === p.key ? 'active' : ''} onClick={() => choose(p.key)}>
+                {p.mark}
+              </button>
+            ))}
+          </div>
+          <button className="secondary" onClick={() => signOut(auth)}>
+            Sign out
+          </button>
+        </div>
+      </header>
+      {product === 'usg' ? <UsgPanel /> : <SmrgPanel />}
     </div>
   );
 }
