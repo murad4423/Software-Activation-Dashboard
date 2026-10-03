@@ -28,3 +28,6 @@ export const rejectRequest = (requestId) => callFunction('admin-reject', { reque
 
 export const issueOffline = (qrJson, validityDays) =>
   callFunction('admin-issue-offline', { qrJson, validityDays });
+
+// USG Reporting app (new software): one admin function, see netlify/functions/usg-admin.js
+export const usgAdmin = (action, fields) => callFunction('usg-admin', { action, ...fields });
