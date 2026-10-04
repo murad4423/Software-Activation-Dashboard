@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { pcDisplayId } from './usgFormat.js';
 
-// Public page a phone opens from the USG Reporting app's Offline Activation QR code:
-//   /usg/activate?r=<base64url of {"v":1,"fp":...,"h":{hospital},"mn":...,"av":...}>
+// Public page a phone opens from a desktop app's Offline Activation QR code (USG or SMRG, see apps.js):
+//   /<app>/activate?r=<base64url of {"v":1,"fp":...,"h":{hospital},"mn":...,"av":...}>
 // Shows the activation code to type into the PC and a licence file to download.
 
 function decodeRequest() {
@@ -19,12 +19,12 @@ function decodeRequest() {
   }
 }
 
-function downloadLicence(token, hospitalName) {
+function downloadLicence(app, token, hospitalName) {
   const blob = new Blob([JSON.stringify({ token }, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `${(hospitalName || 'USG').replace(/[^A-Za-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'USG'}.usglicense`;
+  a.download = `${(hospitalName || app.mark).replace(/[^A-Za-z0-9]+/g, '-').replace(/^-|-$/g, '') || app.mark}.${app.licenceFileExtension}`;
   document.body.appendChild(a);
   a.click();
   a.remove();
@@ -33,7 +33,7 @@ function downloadLicence(token, hospitalName) {
 
 const STATUS_TEXT = { trial: 'Trial', active: 'Active subscription', suspended: 'Suspended' };
 
-export default function UsgActivatePage() {
+export default function UsgActivatePage({ app }) {
   const [data] = useState(decodeRequest);
   const [state, setState] = useState('idle'); // idle | working | done | error
   const [result, setResult] = useState(null);
@@ -41,14 +41,14 @@ export default function UsgActivatePage() {
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
-    document.title = 'Activate - USG Reporting';
+    document.title = `Activate - ${app.fullName}`;
   }, []);
 
   async function activate() {
     setState('working');
     setMessage('');
     try {
-      const res = await fetch('/usg/api/offline-activate', {
+      const res = await fetch(`/${app.key}/api/offline-activate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ r: data.r }),
@@ -71,7 +71,7 @@ export default function UsgActivatePage() {
     return (
       <div className="login-wrap">
         <div className="login-card">
-          <h1>USG Reporting - Activation</h1>
+          <h1>{app.fullName} - Activation</h1>
           <p className="error">{data.error}</p>
         </div>
       </div>
@@ -83,7 +83,7 @@ export default function UsgActivatePage() {
   return (
     <div className="login-wrap usg-activate">
       <div className="login-card usg-activate-card">
-        <h1>USG Reporting - Activation</h1>
+        <h1>{app.fullName} - Activation</h1>
         <div className="muted usg-activate-facts">
           <div><strong>Hospital / Clinic:</strong> {data.hospital.hospitalName || '-'}</div>
           {data.hospital.phone && <div><strong>Phone:</strong> {data.hospital.phone}</div>}
@@ -115,7 +115,7 @@ export default function UsgActivatePage() {
               {copied ? 'Copied!' : 'Copy Code'}
             </button>
             <p className="muted">Or download the licence file and import it on the PC ("Import licence file..."):</p>
-            <button onClick={() => downloadLicence(result.token, result.hospitalName)}>Download Licence File</button>
+            <button onClick={() => downloadLicence(app, result.token, result.hospitalName)}>Download Licence File</button>
           </>
         )}
       </div>

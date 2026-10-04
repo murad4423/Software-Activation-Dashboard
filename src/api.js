@@ -21,13 +21,5 @@ async function callFunction(name, body) {
   return data;
 }
 
-export const approveFinal = (requestId, validityDays) =>
-  callFunction('admin-approve-final', { requestId, validityDays });
-
-export const rejectRequest = (requestId) => callFunction('admin-reject', { requestId });
-
-export const issueOffline = (qrJson, validityDays) =>
-  callFunction('admin-issue-offline', { qrJson, validityDays });
-
-// USG Reporting app (new software): one admin function, see netlify/functions/usg-admin.js
-export const usgAdmin = (action, fields) => callFunction('usg-admin', { action, ...fields });
+// One admin function per desktop app (usg-admin, smrg-admin), see netlify/functions/_shared/handlers.js
+export const appAdmin = (app, action, fields) => callFunction(`${app.key}-admin`, { action, ...fields });

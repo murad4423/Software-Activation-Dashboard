@@ -1,11 +1,13 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { collection, doc, limit, onSnapshot, orderBy, query, where } from 'firebase/firestore';
 import { db } from '../firebase';
-import { usgAdmin } from '../api';
+import { appAdmin } from '../api';
+import { AppContext, useApp } from './apps.js';
 import { EVENT_TEXT, daysLeft, fmtDate, pcDisplayId, toDate, usgStatus } from './usgFormat.js';
 
-// USG Reporting app (new software). Reads Firestore directly (admin-only rules), changes everything through the
-// usg-admin function. Collections: usgDevices, usgResetRequests, usgEvents, usgConfig.
+// Licences, updates and settings of one desktop app (USG or SMRG, see apps.js). Reads Firestore directly (admin-only
+// rules), changes everything through the app's <key>-admin function. Collections: <key>Devices, <key>ResetRequests,
+// <key>Events, <key>Config.
 
 function useCollection(path, ...constraints) {
   const [rows, setRows] = useState(null);
@@ -37,7 +39,7 @@ function CopyChip({ value, label }) {
   );
 }
 
-function exportCsv(rows) {
+function exportCsv(rows, app) {
   const columns = [
     ['hospitalId', (d) => d.hospitalId],
     ['hospitalName', (d) => d.hospitalName],
@@ -62,7 +64,7 @@ function exportCsv(rows) {
   const url = URL.createObjectURL(new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' }));
   const a = document.createElement('a');
   a.href = url;
-  a.download = `usg-devices-${new Date().toISOString().slice(0, 10)}.csv`;
+  a.download = `${app.key}-devices-${new Date().toISOString().slice(0, 10)}.csv`;
   a.click();
   URL.revokeObjectURL(url);
 }
@@ -70,6 +72,7 @@ function exportCsv(rows) {
 // ----- one device: actions + history -----
 
 function DeviceActions({ device }) {
+  const app = useApp();
   const fp = device.fingerprint;
   const [busy, setBusy] = useState('');
   const [error, setError] = useState('');
@@ -80,7 +83,7 @@ function DeviceActions({ device }) {
   const [endDate, setEndDate] = useState(() => toDate(device.endAt)?.toISOString().slice(0, 10) || '');
   const [note, setNote] = useState(device.note || '');
   const [licence, setLicence] = useState(null);
-  const events = useCollection('usgEvents', where('fingerprint', '==', fp), limit(100));
+  const events = useCollection(`${app.key}Events`, where('fingerprint', '==', fp), limit(100));
 
   // Keep the inputs in step with the live record (e.g. after a renewal changed the end date).
   const endIso = toDate(device.endAt)?.toISOString().slice(0, 10) || '';
@@ -92,7 +95,7 @@ function DeviceActions({ device }) {
     setError('');
     setInfo('');
     try {
-      const result = await usgAdmin(action, { fingerprint: fp, ...fields });
+      const result = await appAdmin(app, action, { fingerprint: fp, ...fields });
       if (done) done(result);
     } catch (e) {
       setError(e.message);
@@ -208,7 +211,7 @@ function DeviceActions({ device }) {
         <span className="field-label">Reset this PC</span>
         <div className="card-actions">
           <button className="danger" disabled={!!busy} onClick={() => {
-            if (window.confirm(`Forget this PC (${device.hospitalName || pcDisplayId(fp)})?\n\nIts next activation starts a NEW free trial. A copy of the record is kept in usgDeletedDevices.`)) {
+            if (window.confirm(`Forget this PC (${device.hospitalName || pcDisplayId(fp)})?\n\nIts next activation starts a NEW free trial. A copy of the record is kept in ${app.key}DeletedDevices.`)) {
               run('delete', 'deleteDevice');
             }
           }}>Reset (forget PC)</button>
@@ -222,6 +225,7 @@ function DeviceActions({ device }) {
 // ----- tabs -----
 
 function DevicesTab({ devices }) {
+  const app = useApp();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [sortKey, setSortKey] = useState('endAt');
@@ -266,10 +270,10 @@ function DevicesTab({ devices }) {
     <div>
       <div className="section-head">
         <div>
-          <h2>USG Reporting: Hospitals / PCs</h2>
+          <h2>{app.name}: Hospitals / PCs</h2>
           <p className="muted">One row per PC. Renewals and suspensions reach the PC at its next sync (every 12 hours when online).</p>
         </div>
-        <button className="secondary" onClick={() => exportCsv(filtered)} disabled={filtered.length === 0}>Export CSV</button>
+        <button className="secondary" onClick={() => exportCsv(filtered, app)} disabled={filtered.length === 0}>Export CSV</button>
       </div>
 
       <div className="stat-grid">
@@ -375,7 +379,7 @@ function DevicesTab({ devices }) {
               );
             })}
             {filtered.length === 0 && (
-              <tr><td colSpan={8} className="empty-state">{enriched.length === 0 ? 'No PC has activated the USG app yet.' : 'No PCs match your filters.'}</td></tr>
+              <tr><td colSpan={8} className="empty-state">{enriched.length === 0 ? `No PC has activated the ${app.name} app yet.` : 'No PCs match your filters.'}</td></tr>
             )}
           </tbody>
         </table>
@@ -385,6 +389,7 @@ function DevicesTab({ devices }) {
 }
 
 function ResetTab({ requests }) {
+  const app = useApp();
   const [busyId, setBusyId] = useState(null);
   const [error, setError] = useState('');
   const pending = (requests || []).filter((r) => r.status === 'pending');
@@ -394,7 +399,7 @@ function ResetTab({ requests }) {
     setBusyId(id);
     setError('');
     try {
-      await usgAdmin(action, { requestId: id });
+      await appAdmin(app, action, { requestId: id });
     } catch (e) {
       setError(e.message);
     } finally {
@@ -407,7 +412,7 @@ function ResetTab({ requests }) {
       <div className="section-head">
         <div>
           <h2>Developer reset requests</h2>
-          <p className="muted">Sent by the hidden <code>--usg-dev-license-reset</code> flag. Approving forgets the PC, so its next activation starts a new trial. Approve only PCs you recognise.</p>
+          <p className="muted">Sent by the hidden <code>{app.resetFlag}</code> flag. Approving forgets the PC, so its next activation starts a new trial. Approve only PCs you recognise.</p>
         </div>
         <span className="count-pill">{pending.length} pending</span>
       </div>
@@ -451,6 +456,7 @@ function ResetTab({ requests }) {
 }
 
 function UpdatesTab({ devices }) {
+  const app = useApp();
   const [data, setData] = useState(null);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState('');
@@ -459,7 +465,7 @@ function UpdatesTab({ devices }) {
     setError('');
     setBusy('load');
     try {
-      setData(await usgAdmin('releases', { fresh }));
+      setData(await appAdmin(app, 'releases', { fresh }));
     } catch (e) {
       setError(e.message);
     } finally {
@@ -474,7 +480,7 @@ function UpdatesTab({ devices }) {
     setBusy(name);
     setError('');
     try {
-      await usgAdmin(action, fields);
+      await appAdmin(app, action, fields);
       await load(true);
     } catch (e) {
       setError(e.message);
@@ -496,7 +502,7 @@ function UpdatesTab({ devices }) {
     <div>
       <div className="section-head">
         <div>
-          <h2>Updates (USG Reporting)</h2>
+          <h2>Updates ({app.name})</h2>
           <p className="muted">
             Releases come from GitHub {data ? <code>{data.repo}</code> : ''}. Customers get ONLY the version you release here; test PCs get the newest signed release (pre-releases too).
           </p>
@@ -574,7 +580,8 @@ function UpdatesTab({ devices }) {
 }
 
 function ActivityTab() {
-  const events = useCollection('usgEvents', orderBy('at', 'desc'), limit(200));
+  const app = useApp();
+  const events = useCollection(`${app.key}Events`, orderBy('at', 'desc'), limit(200));
   return (
     <div>
       <div className="section-head">
@@ -609,7 +616,8 @@ function ActivityTab() {
 }
 
 function SettingsTab() {
-  const settings = useDoc('usgConfig', 'settings');
+  const app = useApp();
+  const settings = useDoc(`${app.key}Config`, 'settings');
   const [trialDays, setTrialDays] = useState('');
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
@@ -623,7 +631,7 @@ function SettingsTab() {
     setError('');
     setMessage('');
     try {
-      await usgAdmin('saveSettings', { trialDays: Number(trialDays) });
+      await appAdmin(app, 'saveSettings', { trialDays: Number(trialDays) });
       setMessage('Saved. New PCs get this trial length; existing trials are not changed.');
     } catch (e) {
       setError(e.message);
@@ -636,8 +644,8 @@ function SettingsTab() {
     <div>
       <div className="section-head">
         <div>
-          <h2>Settings (USG Reporting)</h2>
-          <p className="muted">These apply to the USG app only. SMRG settings are not affected.</p>
+          <h2>Settings ({app.name})</h2>
+          <p className="muted">These apply to the {app.name} app only. The other app's settings are not affected.</p>
         </div>
       </div>
       {error && <div className="error">{error}</div>}
@@ -654,10 +662,11 @@ function SettingsTab() {
   );
 }
 
-export default function UsgPanel() {
+function PanelBody() {
+  const app = useApp();
   const [tab, setTab] = useState('devices');
-  const devices = useCollection('usgDevices', orderBy('createdAt', 'desc'));
-  const resets = useCollection('usgResetRequests', orderBy('createdAt', 'desc'), limit(100));
+  const devices = useCollection(`${app.key}Devices`, orderBy('createdAt', 'desc'));
+  const resets = useCollection(`${app.key}ResetRequests`, orderBy('createdAt', 'desc'), limit(100));
   const pendingResets = (resets || []).filter((r) => r.status === 'pending').length;
 
   return (
@@ -679,5 +688,13 @@ export default function UsgPanel() {
         {tab === 'settings' && <SettingsTab />}
       </main>
     </>
+  );
+}
+
+export default function LicencePanel({ app }) {
+  return (
+    <AppContext.Provider value={app}>
+      <PanelBody />
+    </AppContext.Provider>
   );
 }

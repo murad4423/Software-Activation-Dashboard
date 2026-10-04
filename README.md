@@ -1,190 +1,60 @@
-# SMRG License Admin Dashboard
+# License Admin Dashboard (SMRG + USG Reporting)
 
-Netlify Functions backend + React admin dashboard for the SMRG trial/final licensing
-system. Matches the contract already compiled into `SMRG.Security.Licensing`
-(`ActivationApiClient.cs`, `LicenseValidator.cs`, `QrCodeHelper.cs`) exactly — you
-should not need to touch the C# app except to set the server URL once (Step 6).
+Netlify Functions backend + React admin dashboard for two desktop apps that use the same licence system:
 
-## What's in here
+| App | Addresses | Firestore | App repository |
+|---|---|---|---|
+| **SMRG** (Smart Medical Report Generator) | `/smrg/api/*`, `/smrg/activate` | `smrg*` | `Smart-Medical-Report-Generator-Main-code` |
+| **USG Reporting** | `/usg/api/*`, `/usg/activate` | `usg*` | `usg-reporting-main-code` |
+
+Each app has its own licence key, update-signing key, collections and GitHub releases, so a licence for one never
+works in the other. The dashboard's **SMRG | USG** switch picks the app; both get the same tabs: Hospitals / PCs
+(renew +N months, exact end date, suspend, notes, test PC, licence code, forget PC), Reset requests, Updates
+(signed releases, "Release to all", pause), Activity and Settings (trial length).
+
+Contract with each app: `docs/LICENSE_SERVER_API.md` in that app's repository.
+
+## Code
 
 ```
 netlify/functions/
-  activate-trial.js            -> /activateTrial            (client, public)
-  request-final-activation.js  -> /requestFinalActivation    (client, public)
-  check-final-activation.js    -> /checkFinalActivation      (client, public)
-  admin-approve-final.js       (dashboard only, requires admin login)
-  admin-reject.js              (dashboard only)
-  admin-issue-offline.js       (dashboard only - the "paste QR JSON" flow)
-  _shared/license.js           RSA signing, byte-exact match to LicenseValidator.cs
-  _shared/firebaseAdmin.js     Firebase Admin SDK init from env var
-  _shared/adminAuth.js         verifies dashboard login before admin actions
-src/                           React dashboard (Vite)
-firestore.rules                only your admin account can read Firestore directly
-netlify.toml                   redirects + build config
+  _shared/products.js     the two apps: keys (public), issuer, code prefix, collections, GitHub env names
+  _shared/licensing.js    token + activation code signing, device records, rate limits
+  _shared/releases.js     reads + verifies signed releases on GitHub
+  _shared/handlers.js     every endpoint, written once (activate, sync, offline-activate, update, download,
+                          dev-reset-request, not-found, admin)
+  smrg-*.js, usg-*.js     one line each: <handler>(PRODUCTS.<app>)
+  _shared/firebaseAdmin.js, adminAuth.js
+src/
+  Dashboard.jsx           SMRG | USG switch
+  usg/UsgPanel.jsx        the panel (used for both apps, see usg/apps.js)
+  usg/UsgActivatePage.jsx public phone page /<app>/activate (from the app's QR code)
+netlify.toml              routes for /smrg/ and /usg/
+firestore.rules           only the admin account can read Firestore directly; all writes go through functions
 ```
 
-## 1. The one thing I could not do for you: the RSA private key
+## Firebase
 
-`LicenseValidator.cs` already ships with a **public** key hardcoded in the compiled
-app. For signatures to verify, the server must sign with the **exact matching
-private key** — I can't generate a new one, because that would make every license
-this backend issues fail validation in the app you already built.
+Project `sshl-monitoring-system`. Authentication: Email/Password, one user `mdmuradsorkar26@gmail.com` (dashboard
+login). Deploy `firestore.rules` (Firestore → Rules). Optional: TTL policy on `usgRateLimits.expiresAt` (all rate-limit
+counters, both apps, live there).
 
-**Do you still have that private key PEM file** (generated earlier when the public
-key was created)? If yes: don't paste it into this chat — go straight to step 4
-below and put it into Netlify's environment variables yourself.
-
-If it's lost, the only fix is generating a new key pair and updating
-`PublicKeyPem` in `LicenseValidator.cs`, then rebuilding/redistributing the app. Let
-me know if that's the situation and I'll generate a fresh pair + give you the exact
-one-line code change.
-
-## 2. Firebase setup
-
-Project ID (from the service-account filename you shared earlier):
-**`sshl-monitoring-system`** — confirm this is still the right project.
-
-In the Firebase Console for that project:
-
-1. **Authentication → Sign-in method** → enable **Email/Password**.
-2. **Authentication → Users** → add a user with email
-   `mdmuradsorkar26@gmail.com` and a password you choose (this is your dashboard
-   login).
-3. **Project settings → General → Your apps** → if there's no Web app yet, add one
-   (</> icon). Copy the `firebaseConfig` object shown — you'll need these values in
-   step 4 (`VITE_FIREBASE_*`). These are public identifiers, not secrets.
-4. **Project settings → Service accounts** → if you don't already have the service
-   account JSON saved somewhere safe, click **Generate new private key** to get a
-   fresh one (the old one you showed me earlier is fine to reuse if you still have
-   the file — treat it as compromised if it was ever pasted anywhere outside a
-   secrets manager, and regenerate if unsure).
-5. Deploy `firestore.rules` from this repo (Firebase Console → Firestore →
-   Rules → paste the contents of `firestore.rules` → Publish). This is what
-   restricts direct dashboard reads to your one admin email.
-
-## 3. Netlify site
-
-You said you'll add this as a subdomain on your existing Netlify account — that
-works fine as long as it's a **separate site** (separate `netlify.toml`/build),
-which this project already is. Point that new site at this project's folder/repo.
-
-## 4. Netlify environment variables
-
-Site settings → Environment variables → add:
+## Netlify environment variables
 
 | Key | Value |
 |---|---|
-| `FIREBASE_SERVICE_ACCOUNT` | base64 of the full service-account JSON file |
-| `LICENSE_PRIVATE_KEY` | base64 of the RSA private key PEM (matching the public key in `LicenseValidator.cs`) |
+| `FIREBASE_SERVICE_ACCOUNT` | base64 of the service-account JSON |
 | `ADMIN_EMAIL` | `mdmuradsorkar26@gmail.com` |
-| `FINAL_LICENSE_VALIDITY_DAYS` | optional, defaults to `3650` (~10 years) if unset — set this to whatever your actual paid-license term is |
-| `VITE_FIREBASE_API_KEY` | from step 2.3 |
-| `VITE_FIREBASE_AUTH_DOMAIN` | from step 2.3 |
-| `VITE_FIREBASE_PROJECT_ID` | from step 2.3 |
-| `VITE_FIREBASE_STORAGE_BUCKET` | from step 2.3 |
-| `VITE_FIREBASE_MESSAGING_SENDER_ID` | from step 2.3 |
-| `VITE_FIREBASE_APP_ID` | from step 2.3 |
+| `VITE_FIREBASE_*` | the web app's firebaseConfig (public identifiers) |
+| `SMRG_LICENSE_PRIVATE_KEY` | text of `Documents\SMRG-License-Keys\license-private-key.pem` (secret) |
+| `GITHUB_REPO_OWNER` / `GITHUB_REPO_NAME` / `GITHUB_TOKEN` | SMRG releases repo + fine-grained token ("Contents: Read-only" on that repo) |
+| `USG_LICENSE_PRIVATE_KEY` | text of `Documents\USG-License-Keys\license-private-key.pem` (secret) |
+| `USG_GITHUB_OWNER` / `USG_GITHUB_REPO` / `USG_GITHUB_TOKEN` | USG releases repo + token |
 
-To base64-encode a file:
+The server checks each licence key against the app's public key and says exactly what is wrong if a key is missing,
+public, or the other app's. The **update-signing** private keys are NOT put into Netlify — they stay on the developer PC.
 
-```bash
-# Linux/macOS
-base64 -w0 service-account.json
+## Deploy
 
-# Windows PowerShell
-[Convert]::ToBase64String([IO.File]::ReadAllBytes("service-account.json"))
-```
-
-Same for the private key `.pem` file. Never commit either raw file, and never paste
-their contents into a chat — only into Netlify's env var fields.
-
-## 5. Deploy
-
-```bash
-npm install
-npm run build   # sanity-check the frontend builds locally
-```
-
-Then push to the repo Netlify is watching (or connect this folder directly). Netlify
-runs `npm run build`, publishes `dist/`, and deploys everything under
-`netlify/functions/` automatically per `netlify.toml`.
-
-## 6. Point the C# app at the deployed URL
-
-In `ActivationApiClient.cs`:
-
-```csharp
-private const string BaseUrl = "https://REPLACE_WITH_CLOUD_FUNCTIONS_URL";
-```
-
-Change it to your deployed site's base URL, e.g.
-`https://smrg-license.yourdomain.com` (no trailing slash) — the redirects in
-`netlify.toml` make `/activateTrial`, `/requestFinalActivation`, and
-`/checkFinalActivation` resolve correctly from there. Rebuild the app once with this
-change.
-
-## 7. Test it
-
-- Online trial: run the app, "Apply for Activate" on the Online tab → should get a
-  license key back immediately.
-- Same machine again: should be rejected ("already used its trial").
-- Offline: generate the QR/JSON on the app's Offline tab, paste that JSON string into
-  the dashboard's **Offline Entry** tab, issue a license, paste it back into the app.
-- Final/paid: request final activation → shows up under **Pending Activations** in
-  the dashboard → Approve → app's "Check Activation Status" picks up the license.
-
-## Design notes / things you may want to change
-
-- **Final license validity** defaults to 10 years (`FINAL_LICENSE_VALIDITY_DAYS`).
-  If your paid license is meant to be a yearly subscription rather than
-  effectively-perpetual, lower this (e.g. `365`) or set it per-approval from the
-  dashboard's "validity (days)" field.
-- **Trial duration** is 30 days, matching `LicenseManager.TrialDurationDays` in the
-  C# app — kept as a constant in `activate-trial.js` and
-  `admin-issue-offline.js`, change both if you ever change the client constant.
-- Abuse prevention is keyed purely on machine fingerprint (`devices/{machineId}`
-  doc existing with a `trialLicenseId`). Institution/email/phone duplicate-checking
-  (mentioned as a "could also do this" in the original plan) isn't implemented —
-  say the word if you want one hospital blocked from requesting multiple trials
-  under different machines too.
-
----
-
-# USG Reporting app (second software, same site)
-
-The same site, Firebase project and admin login also run the **USG Reporting** desktop app. The dashboard has a
-**SMRG | USG** switch at the top. Nothing of the SMRG system was changed: its functions, routes, RSA key and
-Firestore collections (`devices`, `activationRequests`) are untouched.
-
-Everything for USG lives under **`/usg/`** (see `netlify.toml`):
-
-| Address | Function | Used by |
-|---|---|---|
-| `POST /usg/api/activate` | `usg-activate.js` | app: online activation (new PC = trial, known PC = its licence) |
-| `POST /usg/api/sync` | `usg-sync.js` | app: every 12 h, picks up renewals / suspensions |
-| `POST /usg/api/dev-reset-request` | `usg-dev-reset-request.js` | app: hidden dev reset (only recorded) |
-| `/usg/activate?r=...` + `POST /usg/api/offline-activate` | `src/usg/UsgActivatePage.jsx`, `usg-offline-activate.js` | phone, from the app's QR code |
-| `POST /usg/api/update` | `usg-update.js` | app: Check for Updates |
-| `GET /usg/api/update/download?asset=` | `usg-update-download.js` | app: download (redirect to GitHub) |
-| `/.netlify/functions/usg-admin` | `usg-admin.js` | dashboard (admin login required) |
-
-Contract with the app: `Software Code/docs/LICENSE_SERVER_API.md`.
-
-Firestore (all new, `usg*`): `usgDevices`, `usgResetRequests`, `usgEvents`, `usgConfig` (settings, counters, updates),
-`usgRateLimits`, `usgDeletedDevices`. The existing `firestore.rules` already restricts reads to the admin account.
-
-## Extra Netlify environment variables (the existing ones stay as they are)
-
-| Key | Value |
-|---|---|
-| `USG_LICENSE_PRIVATE_KEY` | text of `C:\Users\user\Documents\USG-License-Keys\license-private-key.pem` (ECDSA, NOT the SMRG RSA key) |
-| `USG_GITHUB_OWNER` | GitHub account that holds the USG releases repo |
-| `USG_GITHUB_REPO` | that repository's name (may be private) |
-| `USG_GITHUB_TOKEN` | fine-grained token, only that repo, permission "Contents: Read-only" |
-
-The **update-signing** private key is NOT put into Netlify — it stays on the developer PC (see
-`Software Code/docs/LICENSE_DEVELOPER_NOTES.md`, "Releasing an update").
-
-## Firestore TTL (optional, keeps the database small)
-
-Firebase Console → Firestore → TTL policies → collection `usgRateLimits`, field `expiresAt`.
+Pushing to `main` deploys to production (Netlify builds `npm run build` and the functions). If a deploy breaks the
+site: Netlify → Deploys → the previous good deploy → **Publish deploy**.

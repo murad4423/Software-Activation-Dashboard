@@ -1,59 +1,47 @@
-// Shared code for the USG Reporting app (the NEW desktop app) — everything under /usg/...
+// Licensing shared by the desktop apps (USG Reporting under /usg/..., SMRG under /smrg/...). Every function takes the
+// product (products.js), which decides the key, the token issuer, the code prefix and the Firestore collections — so
+// the two apps share the code but never their data or keys.
 //
-// Completely separate from the SMRG app's licensing (license.js / body.js / the
-// devices + activationRequests collections): different key (ECDSA P-256, not RSA),
-// different token format (ES256 JWT + "USG1-" activation code), different Firestore
-// collections (usg*). Nothing here reads or writes SMRG data.
-//
-// Contract with the desktop app: Software Code/docs/LICENSE_SERVER_API.md.
-// signToken / makeActivationCode are copied from Software Code/tools/make-license.mjs
+// Contract with the desktop apps: docs/LICENSE_SERVER_API.md in each app's repository.
+// signToken / makeActivationCode are copied from the USG repository's tools/make-license.mjs
 // (the reference implementation the app is tested against) — keep them byte-identical.
 //
-// Firestore layout:
-//   usgDevices/{fingerprint}   one record per PC: hospital details, status, end date
-//   usgResetRequests/{auto}    developer reset requests waiting for approval
-//   usgEvents/{auto}           log: activations, renewals, suspensions, resets...
-//   usgConfig/settings         { trialDays }
-//   usgConfig/counters         { nextHospitalId }
-//   usgConfig/updates          { releasedVersion, paused, testDevices: [fingerprint] }
-//   usgRateLimits/{key}        request counters
+// Firestore layout (prefix "usg" or "smrg"):
+//   <p>Devices/{fingerprint}   one record per PC: hospital details, status, end date
+//   <p>ResetRequests/{auto}    developer reset requests waiting for approval
+//   <p>Events/{auto}           log: activations, renewals, suspensions, resets...
+//   <p>Config/settings         { trialDays }
+//   <p>Config/counters         { nextHospitalId }
+//   <p>Config/updates          { releasedVersion, paused }
+//   usgRateLimits/{key}        request counters (all products; SMRG keys start with "smrg:")
 
 import { createPrivateKey, createPublicKey, sign } from 'node:crypto';
 import { getAdmin } from './firebaseAdmin.js';
+import { collectionName } from './products.js';
 
 // ----- licence signing (copied from tools/make-license.mjs) -----
 
-const ISSUER = 'usg-license';
 const DAY_ZERO = Date.UTC(2020, 0, 1);
 const CROCKFORD = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
 const STATUS_CODES = { trial: 1, active: 2, expired: 3, suspended: 4 };
 
 const base64url = (buffer) => Buffer.from(buffer).toString('base64').replace(/=+$/, '').replace(/\+/g, '-').replace(/\//g, '_');
 
-/**
- * The PEM text from USG_LICENSE_PRIVATE_KEY, repaired if pasting lost its line breaks: a value pasted into a
- * one-line field often arrives with spaces or literal "\n" instead of newlines, which crypto can't read.
- */
-const WRONG_KEY_HELP = 'Put the full text of license-private-key.pem (USG-License-Keys folder) into USG_LICENSE_PRIVATE_KEY, then redeploy.';
-/** The licence PUBLIC key built into the app (LicenseToken.PublicKeySpki): the private key must belong to it. */
-const APP_LICENCE_PUBLIC_KEY =
-  'MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEitG5I1SHusf8B5On58jF45CY5EMVPZAq1dRww3qg3WSJivyCc5/TrIp7J4iETiWXlZyc/yg2beQtVFFsJszQEg==';
-let checkedKey = null;
+const checkedKeys = new Map(); // product id -> { raw, pem }
 
 /**
- * The licence private key from USG_LICENSE_PRIVATE_KEY, as a PEM string. Tolerates a paste that lost its line breaks
- * or its BEGIN/END lines, and says exactly what is wrong when it is a public key or the wrong key.
+ * The licence private key of a product (its environment variable), as a PEM string. Tolerates a paste that lost its
+ * line breaks or its BEGIN/END lines, and says exactly what is wrong when it is a public key or the wrong key.
  */
-function privateKeyPem() {
-  const raw = (process.env.USG_LICENSE_PRIVATE_KEY || '').replace(/\\n/g, '\n').trim();
-  if (checkedKey && checkedKey.raw === raw) return checkedKey.pem;
-  if (!raw) throw new Error('USG_LICENSE_PRIVATE_KEY is not set. ' + WRONG_KEY_HELP);
-
+function privateKeyPem(product) {
+  const raw = (process.env[product.licenceKeyEnv] || '').replace(/\\n/g, '\n').trim();
+  const checked = checkedKeys.get(product.id);
+  if (checked && checked.raw === raw) return checked.pem;
+  if (!raw) throw new Error(`${product.licenceKeyEnv} is not set. ` + product.licenceKeyHelp);
   const m = /-----BEGIN ([A-Z ]+)-----([\s\S]*?)-----END \1-----/.exec(raw);
   const label = m ? m[1] : 'PRIVATE KEY';
   const body = (m ? m[2] : raw).replace(/[^A-Za-z0-9+/=]/g, '');
-  if (/PUBLIC/.test(label)) throw new Error('USG_LICENSE_PRIVATE_KEY contains a PUBLIC key. ' + WRONG_KEY_HELP);
-
+  if (/PUBLIC/.test(label)) throw new Error(`${product.licenceKeyEnv} contains a PUBLIC key. ` + product.licenceKeyHelp);
   let key;
   try {
     key = createPrivateKey(`-----BEGIN ${label}-----\n${(body.match(/.{1,64}/g) || []).join('\n')}\n-----END ${label}-----\n`);
@@ -65,23 +53,23 @@ function privateKeyPem() {
     } catch {
       // neither
     }
-    throw new Error(`USG_LICENSE_PRIVATE_KEY is ${isPublic ? 'a PUBLIC key (e.g. a *-public-key.txt file)' : 'not a readable private key (incomplete copy?)'}. ` + WRONG_KEY_HELP);
+    throw new Error(`${product.licenceKeyEnv} is ${isPublic ? 'a PUBLIC key (e.g. a *-public-key.txt file)' : 'not a readable private key (incomplete copy?)'}. ` + product.licenceKeyHelp);
   }
   const publicSpki = createPublicKey(key).export({ type: 'spki', format: 'der' }).toString('base64');
-  if (publicSpki !== APP_LICENCE_PUBLIC_KEY) {
-    throw new Error('USG_LICENSE_PRIVATE_KEY is a private key, but not the LICENCE key the app trusts (update-signing key?). ' + WRONG_KEY_HELP);
+  if (publicSpki !== product.licencePublicKey) {
+    throw new Error(`${product.licenceKeyEnv} is a private key, but not the LICENCE key the ${product.name} app trusts (update-signing key, or the other app's key?). ` + product.licenceKeyHelp);
   }
   const pem = key.export({ type: 'pkcs8', format: 'pem' });
-  checkedKey = { raw, pem };
+  checkedKeys.set(product.id, { raw, pem });
   return pem;
 }
 
 /** ES256 JWT. The signature is the raw 64-byte r||s ("ieee-p1363"), as JWT requires. */
-export function signToken(privateKey, { fingerprint, hospitalId, hospitalName, status, issuedAt, expiresAt }) {
+export function signToken(privateKey, { issuer, fingerprint, hospitalId, hospitalName, status, issuedAt, expiresAt }) {
   const header = base64url(JSON.stringify({ alg: 'ES256', typ: 'JWT' }));
   const payload = base64url(
     JSON.stringify({
-      iss: ISSUER,
+      iss: issuer,
       sub: String(hospitalId),
       fp: fingerprint.toLowerCase(),
       status,
@@ -112,18 +100,18 @@ function base32(bytes) {
   return output;
 }
 
-/** The short code typed in by hand: "USG1-" + base32 of [version, status, hospital id, issued day, end day, signature]. */
-export function makeActivationCode(privateKey, { fingerprint, hospitalId, status, issuedAt, expiresAt }) {
+/** The short code typed in by hand: "<prefix>-" + base32 of [version, status, hospital id, issued day, end day, signature]. */
+export function makeActivationCode(privateKey, { codePrefix, fingerprint, hospitalId, status, issuedAt, expiresAt }) {
   const fields = Buffer.alloc(10);
   fields[0] = 1;
   fields[1] = STATUS_CODES[status] ?? 2;
   fields.writeUInt32BE(Number(hospitalId) >>> 0, 2);
   fields.writeUInt16BE(Math.floor((issuedAt.getTime() - DAY_ZERO) / 86400000), 6);
   fields.writeUInt16BE(Math.floor((expiresAt.getTime() - DAY_ZERO) / 86400000), 8); // the licence runs to the END of this day (UTC)
-  const signed = Buffer.concat([Buffer.from(`USG1|${fingerprint.toLowerCase()}|`, 'utf8'), fields]);
+  const signed = Buffer.concat([Buffer.from(`${codePrefix}|${fingerprint.toLowerCase()}|`, 'utf8'), fields]);
   const signature = sign('sha256', signed, { key: createPrivateKey(privateKey), dsaEncoding: 'ieee-p1363' });
   const encoded = base32(Buffer.concat([fields, signature]));
-  return 'USG1-' + encoded.match(/.{1,5}/g).join('-');
+  return `${codePrefix}-` + encoded.match(/.{1,5}/g).join('-');
 }
 
 // ----- device records -> licences -----
@@ -133,9 +121,11 @@ export const DEFAULT_TRIAL_DAYS = 30;
 const toDate = (value) => (value?.toDate ? value.toDate() : value ? new Date(value) : null);
 
 /** The licence for a device record, exactly as stored now (status + end date set in the dashboard). */
-export function licenceFor(device) {
-  const key = privateKeyPem();
+export function licenceFor(product, device) {
+  const key = privateKeyPem(product);
   const licence = {
+    issuer: product.issuer,
+    codePrefix: product.codePrefix,
     fingerprint: device.fingerprint,
     hospitalId: device.hospitalId,
     hospitalName: device.hospitalName || undefined,
@@ -150,6 +140,11 @@ export function db() {
   return getAdmin().firestore();
 }
 
+/** A product's Firestore collection, e.g. collection(PRODUCTS.smrg, 'Devices') -> smrgDevices. */
+export function collection(product, name) {
+  return db().collection(collectionName(product, name));
+}
+
 export function serverTimestamp() {
   return getAdmin().firestore.FieldValue.serverTimestamp();
 }
@@ -158,18 +153,18 @@ export function timestamp(date) {
   return getAdmin().firestore.Timestamp.fromDate(date);
 }
 
-export async function getSettings() {
-  const snap = await db().collection('usgConfig').doc('settings').get();
+export async function getSettings(product) {
+  const snap = await collection(product, 'Config').doc('settings').get();
   const data = snap.exists ? snap.data() : {};
   const trialDays = Number(data.trialDays);
   return { trialDays: Number.isFinite(trialDays) && trialDays > 0 ? trialDays : DEFAULT_TRIAL_DAYS };
 }
 
-export async function logEvent(type, fingerprint, details = {}) {
+export async function logEvent(product, type, fingerprint, details = {}) {
   try {
-    await db().collection('usgEvents').add({ type, fingerprint: fingerprint || null, ...details, at: serverTimestamp() });
+    await collection(product, 'Events').add({ type, fingerprint: fingerprint || null, ...details, at: serverTimestamp() });
   } catch (err) {
-    console.error('usg logEvent failed:', err);
+    console.error(`${product.id} logEvent failed:`, err);
   }
 }
 
@@ -203,11 +198,11 @@ export const isFingerprint = (value) => typeof value === 'string' && /^[0-9a-fA-
  * The record for this PC: the existing one (same PC again, e.g. after reinstalling -> the SAME licence, never a fresh
  * trial), or a new trial record. Transactional, so two parallel requests can't create two trials / two hospital ids.
  */
-export async function findOrCreateDevice({ fingerprint, hospital, components, machineName, appVersion, via, ip }) {
+export async function findOrCreateDevice(product, { fingerprint, hospital, components, machineName, appVersion, via, ip }) {
   const fp = fingerprint.toLowerCase();
   const firestore = db();
-  const ref = firestore.collection('usgDevices').doc(fp);
-  const { trialDays } = await getSettings();
+  const ref = collection(product, 'Devices').doc(fp);
+  const { trialDays } = await getSettings(product);
 
   const result = await firestore.runTransaction(async (tx) => {
     const snap = await tx.get(ref);
@@ -215,7 +210,7 @@ export async function findOrCreateDevice({ fingerprint, hospital, components, ma
       tx.update(ref, { lastSeenAt: serverTimestamp(), appVersion: appVersion || snap.data().appVersion || '', machineName: machineName || snap.data().machineName || '', lastIp: ip || null });
       return { device: snap.data(), created: false };
     }
-    const counterRef = firestore.collection('usgConfig').doc('counters');
+    const counterRef = collection(product, 'Config').doc('counters');
     const counter = await tx.get(counterRef);
     const hospitalId = counter.exists && Number(counter.data().nextHospitalId) > 0 ? Number(counter.data().nextHospitalId) : 1001;
     const now = new Date();
@@ -246,7 +241,7 @@ export async function findOrCreateDevice({ fingerprint, hospital, components, ma
     return { device: { ...device, endAt: endAt }, created: true };
   });
 
-  await logEvent(result.created ? 'trial-started' : 'reactivated', fp, {
+  await logEvent(product, result.created ? 'trial-started' : 'reactivated', fp, {
     via,
     hospitalName: result.device.hospitalName || '',
     ...(result.created ? { trialDays } : {}),
@@ -256,11 +251,11 @@ export async function findOrCreateDevice({ fingerprint, hospital, components, ma
 
 // ----- rate limiting (fixed window counters in Firestore) -----
 
-/** True when allowed. `key` should be specific, e.g. "activate:ip:1.2.3.4". */
-export async function rateLimit(key, limit, windowSeconds) {
+/** True when allowed. `key` should be specific, e.g. "activate:ip:1.2.3.4"; the product's prefix is added here. */
+export async function rateLimit(product, key, limit, windowSeconds) {
   const firestore = db();
   const windowStart = Math.floor(Date.now() / 1000 / windowSeconds) * windowSeconds;
-  const id = `${key}:${windowStart}`.replace(/[\/]/g, '_').slice(0, 400);
+  const id = `${product.rateLimitPrefix}${key}:${windowStart}`.replace(/[\/]/g, '_').slice(0, 400);
   const ref = firestore.collection('usgRateLimits').doc(id);
   try {
     return await firestore.runTransaction(async (tx) => {
@@ -271,7 +266,7 @@ export async function rateLimit(key, limit, windowSeconds) {
       return true;
     });
   } catch (err) {
-    console.error('usg rateLimit failed (allowing):', err);
+    console.error(`${product.id} rateLimit failed (allowing):`, err);
     return true; // never lock hospitals out because the counter itself failed
   }
 }
@@ -299,7 +294,7 @@ export function json(status, body) {
   });
 }
 
-/** The error shape the desktop app expects: {"error": code, "message": text shown to the hospital}. */
+/** The error shape the desktop apps expect: {"error": code, "message": text shown to the hospital}. */
 export function fail(status, error, message) {
   return json(status, { error, message });
 }
