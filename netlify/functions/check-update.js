@@ -9,12 +9,17 @@
 // variables):
 //   GITHUB_REPO_OWNER  - e.g. "murad4423"
 //   GITHUB_REPO_NAME   - the repo where you publish Releases with the exe + sha256
-//   GITHUB_TOKEN       - only required if that repo is PRIVATE. Leave unset for a
-//                        public repo.
+//   GITHUB_TOKEN       - required if that repo is PRIVATE (fine-grained token,
+//                        read-only "Contents" on that repo).
 //
 // Release asset naming: this function picks the first asset ending in ".exe" as
 // the installer, and the first asset ending in ".sha256" as the checksum file.
 // Attach exactly one of each to every GitHub Release.
+//
+// downloadUrl / checksumUrl point at check-update-download on THIS site, not at
+// GitHub: a private repo's browser_download_url answers 404 without a token, and
+// the app downloads without one. check-update-download redirects to GitHub's
+// short-lived download address, so the token never leaves the server.
 
 import { jsonResponse } from './_shared/body.js';
 
@@ -38,6 +43,7 @@ export default async function (request) {
     const headers = {
       Accept: 'application/vnd.github+json',
       'User-Agent': 'SMRG-check-update-function',
+      'X-GitHub-Api-Version': '2022-11-28',
     };
     if (token) headers.Authorization = `Bearer ${token}`;
 
@@ -47,6 +53,9 @@ export default async function (request) {
     );
 
     if (ghResponse.status === 404) {
+      // A private repo also answers 404 when GITHUB_TOKEN is missing/expired or
+      // can't read it - log which repo was asked so that's easy to spot.
+      console.error(`check-update: GitHub 404 for ${owner}/${repo} (token set: ${Boolean(token)})`);
       return jsonResponse(200, {
         success: false,
         message: 'No release has been published yet.',
@@ -80,11 +89,13 @@ export default async function (request) {
       });
     }
 
+    const downloadBase = `${new URL(request.url).origin}/.netlify/functions/check-update-download?asset=`;
+
     return jsonResponse(200, {
       success: true,
       version,
-      downloadUrl: exeAsset.browser_download_url,
-      checksumUrl: shaAsset ? shaAsset.browser_download_url : null,
+      downloadUrl: downloadBase + exeAsset.id,
+      checksumUrl: shaAsset ? downloadBase + shaAsset.id : null,
       releaseNotes: release.body || '',
     });
   } catch (err) {
