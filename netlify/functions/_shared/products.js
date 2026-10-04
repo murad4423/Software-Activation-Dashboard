@@ -37,7 +37,7 @@ export const PRODUCTS = {
 
   smrg: {
     id: 'smrg',
-    name: 'SMRG',
+    name: 'SmartMed Opti Report',
     issuer: 'smrg-license',
     codePrefix: 'SMRG1',
     collectionPrefix: 'smrg',

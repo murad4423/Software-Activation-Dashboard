@@ -4,11 +4,11 @@ Netlify Functions backend + React admin dashboard for two desktop apps that use 
 
 | App | Addresses | Firestore | App repository |
 |---|---|---|---|
-| **SMRG** (Smart Medical Report Generator) | `/smrg/api/*`, `/smrg/activate` | `smrg*` | `Smart-Medical-Report-Generator-Main-code` |
+| **SmartMed Opti Report** (SMRG, by SmartMed) | `/smrg/api/*`, `/smrg/activate` | `smrg*` | `Smart-Medical-Report-Generator-Main-code` |
 | **USG Reporting** | `/usg/api/*`, `/usg/activate` | `usg*` | `usg-reporting-main-code` |
 
 Each app has its own licence key, update-signing key, collections and GitHub releases, so a licence for one never
-works in the other. The dashboard's **SMRG | USG** switch picks the app; both get the same tabs: Hospitals / PCs
+works in the other. The dashboard's **OPTI | USG** switch picks the app; both get the same tabs: Hospitals / PCs
 (renew +N months, exact end date, suspend, notes, test PC, licence code, forget PC), Reset requests, Updates
 (signed releases, "Release to all", pause), Activity and Settings (trial length).
 
