@@ -6,11 +6,8 @@
 //   SMRG (Smart Medical Report Gen.) /smrg/api/*, /smrg/activate, collections smrg*
 //   SmartMed X-ray Report            /xray/api/*, /xray/activate, collections xray*
 //
-// SMRG has its own key pair. X-ray was built from the USG app and still carries the SAME licence and update-signing
-// public keys, so XRAY_LICENSE_PRIVATE_KEY is the same PEM as USG_LICENSE_PRIVATE_KEY (and the same key signs both
-// update packages). The products stay apart anyway: "iss"/code prefix are inside what the licence signature covers
-// (usg-license/USG1 vs xray-license/XRAY1), and so is the update prefix (USGUPD1 vs XRAYUPD1) — a USG licence or
-// package is refused by the X-ray app and the other way round. Giving X-ray its own key pair means a new app build.
+// Every product has its OWN key pair, so nothing of one works for another. (X-ray was built from the USG app and
+// shared USG's keys up to version 1.0.7; from 1.0.8 it has its own, made 2026-10-10 — XRAY-License-Keys.)
 //
 // The USG values below are exactly what the USG app was built against — do not change them.
 
@@ -74,13 +71,13 @@ export const PRODUCTS = {
     collectionPrefix: 'xray',
     rateLimitPrefix: 'xray:',
     licenceKeyEnv: 'XRAY_LICENSE_PRIVATE_KEY',
-    licenceKeyHelp: 'Put the full text of license-private-key.pem (USG-License-Keys folder — the X-ray app uses the same licence key) into XRAY_LICENSE_PRIVATE_KEY, then redeploy.',
-    /** Same as LicenseToken.PublicKeySpki in the X-ray app (today the same key pair as USG — see the note above). */
+    licenceKeyHelp: 'Put the full text of license-private-key.pem (XRAY-License-Keys folder) into XRAY_LICENSE_PRIVATE_KEY, then redeploy.',
+    /** Same as LicenseToken.PublicKeySpki in the X-ray app (1.0.8 and newer). */
     licencePublicKey:
-      'MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEitG5I1SHusf8B5On58jF45CY5EMVPZAq1dRww3qg3WSJivyCc5/TrIp7J4iETiWXlZyc/yg2beQtVFFsJszQEg==',
-    /** Same as UpdateSignature.PublicKeySpki in the X-ray app. */
+      'MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEzkbvJGqwCTo5RVxuDMf06sZjqEmQpRLvweFcJ+Rh+U5atvZc/eAKlHgOJcMnr59Iro4kr2oC7n2Cd2zhPyTzcA==',
+    /** Same as UpdateSignature.PublicKeySpki in the X-ray app (1.0.8 and newer). */
     updatePublicKey:
-      'MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAErcZN7PxFoA8+U+tSb98Ff9EPIc+RuJULYu0gBvDRDeGDnAXTlW+IvGGz60CNiWUm0i1eF0GRR782f8VLPUOIqQ==',
+      'MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEizMyG2u9DU67+apErJO49/u7NNLUw7T3dmcBjYVmDkCJUmr50VCsaswTCmJZUwBPzESvQ7Fy4et1qaCCcqdJog==',
     updateMessagePrefix: 'XRAYUPD1',
     updateManifestFormat: 'xray-update-1',
     // SmartMed-XRay-Report-<version>.zip + .zip.sig on each release.

@@ -8,9 +8,8 @@ Netlify Functions backend + React admin dashboard for three desktop apps that us
 | **USG Reporting** | `/usg/api/*`, `/usg/activate` | `usg*` | `usg-reporting-main-code` |
 | **SmartMed X-ray Report** | `/xray/api/*`, `/xray/activate` | `xray*` | `SmartMed-X-Ray-Repoting-main-code` |
 
-Each app has its own collections, GitHub releases, licence issuer and activation-code prefix, so a licence for one
-never works in another. SMRG has its own key pair; X-ray was built from the USG app and still carries the same
-licence and update-signing keys as USG (see `_shared/products.js`). The dashboard's **OPTI | USG | XRAY** switch
+Each app has its own licence key, update-signing key, collections and GitHub releases, so a licence for one never
+works in another. The dashboard's **OPTI | USG | XRAY** switch
 picks the app; all of them get the same tabs: Hospitals / PCs
 (renew +N months, exact end date, suspend, notes, test PC, licence code, forget PC), Reset requests, Updates
 (signed releases, "Release to all", pause), Activity and Settings (trial length).
@@ -54,7 +53,7 @@ counters, every app, live there).
 | `GITHUB_REPO_OWNER` / `GITHUB_REPO_NAME` / `GITHUB_TOKEN` | SMRG releases repo + fine-grained token ("Contents: Read-only" on that repo) |
 | `USG_LICENSE_PRIVATE_KEY` | text of `Documents\USG-License-Keys\license-private-key.pem` (secret) |
 | `USG_GITHUB_OWNER` / `USG_GITHUB_REPO` / `USG_GITHUB_TOKEN` | USG releases repo + token |
-| `XRAY_LICENSE_PRIVATE_KEY` | text of `Documents\USG-License-Keys\license-private-key.pem` — the X-ray app uses the same licence key as USG (secret) |
+| `XRAY_LICENSE_PRIVATE_KEY` | text of `Documents\XRAY-License-Keys\license-private-key.pem` (secret) |
 | `XRAY_GITHUB_OWNER` / `XRAY_GITHUB_REPO` / `XRAY_GITHUB_TOKEN` | `murad4423` / `SmartMed-X-Ray-Repoting-main-code` + token |
 
 The server checks each licence key against the app's public key and says exactly what is wrong if a key is missing,
