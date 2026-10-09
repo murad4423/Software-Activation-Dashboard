@@ -6,7 +6,7 @@
 [functions]
   node_bundler = "esbuild"
 
-# Two desktop apps share this site and its licensing code (netlify/functions/_shared), each under its own prefix.
+# Three desktop apps share this site and its licensing code (netlify/functions/_shared), each under its own prefix.
 
 # ---------------------------------------------------------------------------
 # USG Reporting app - everything under /usg/. Contract: docs/LICENSE_SERVER_API.md in the app repository.
@@ -86,6 +86,46 @@
 [[redirects]]
   from = "/smrg/api/*"
   to = "/.netlify/functions/smrg-not-found"
+  status = 404
+
+# ---------------------------------------------------------------------------
+# SmartMed X-ray Report - everything under /xray/. Contract: docs/LICENSE_SERVER_API.md in the app repository.
+# The public /xray/activate page (QR code -> phone) is served by the SPA fallback below.
+# ---------------------------------------------------------------------------
+[[redirects]]
+  from = "/xray/api/activate"
+  to = "/.netlify/functions/xray-activate"
+  status = 200
+
+[[redirects]]
+  from = "/xray/api/sync"
+  to = "/.netlify/functions/xray-sync"
+  status = 200
+
+[[redirects]]
+  from = "/xray/api/dev-reset-request"
+  to = "/.netlify/functions/xray-dev-reset-request"
+  status = 200
+
+[[redirects]]
+  from = "/xray/api/offline-activate"
+  to = "/.netlify/functions/xray-offline-activate"
+  status = 200
+
+[[redirects]]
+  from = "/xray/api/update"
+  to = "/.netlify/functions/xray-update"
+  status = 200
+
+[[redirects]]
+  from = "/xray/api/update/download"
+  to = "/.netlify/functions/xray-update-download"
+  status = 200
+
+# Anything else under /xray/api/ is a JSON 404, never the dashboard's HTML.
+[[redirects]]
+  from = "/xray/api/*"
+  to = "/.netlify/functions/xray-not-found"
   status = 404
 
 # SPA fallback for the React dashboard (client-side routing)

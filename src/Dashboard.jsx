@@ -4,12 +4,13 @@ import { auth } from './firebase';
 import { APPS } from './usg/apps.js';
 import LicencePanel from './usg/UsgPanel.jsx';
 
-// Both desktop apps (SMRG and USG Reporting) use the same licence system; the switch picks which one is shown.
-const PRODUCTS = [APPS.smrg, APPS.usg];
+// All three desktop apps (SMRG, USG Reporting and X-ray) use the same licence system; the switch picks the one shown.
+const PRODUCTS = [APPS.smrg, APPS.usg, APPS.xray];
 
 function readProduct() {
   try {
-    return localStorage.getItem('dashboard.product') === 'usg' ? 'usg' : 'smrg';
+    const saved = localStorage.getItem('dashboard.product');
+    return APPS[saved] ? saved : 'smrg';
   } catch {
     return 'smrg';
   }
