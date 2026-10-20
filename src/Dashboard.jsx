@@ -4,8 +4,8 @@ import { auth } from './firebase';
 import { APPS } from './usg/apps.js';
 import LicencePanel from './usg/UsgPanel.jsx';
 
-// All three desktop apps (SMRG, USG Reporting and X-ray) use the same licence system; the switch picks the one shown.
-const PRODUCTS = [APPS.smrg, APPS.usg, APPS.xray];
+// All the desktop apps (SMRG, USG Reporting, X-ray and the Display Hub) use the same licence system; the switch picks the one shown.
+const PRODUCTS = [APPS.smrg, APPS.usg, APPS.xray, APPS.displayhub];
 
 function readProduct() {
   try {

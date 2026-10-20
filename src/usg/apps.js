@@ -27,6 +27,14 @@ export const APPS = {
     resetFlag: '--xray-dev-license-reset',
     licenceFileExtension: 'xraylicense',
   },
+  displayhub: {
+    key: 'displayhub',
+    mark: 'HUB',
+    name: 'SmartMed Display Hub',
+    fullName: 'SmartMed Display Hub',
+    resetFlag: '--displayhub-dev-license-reset',
+    licenceFileExtension: 'dhublicense',
+  },
 };
 
 /** The app the current panel shows (set by LicencePanel). */

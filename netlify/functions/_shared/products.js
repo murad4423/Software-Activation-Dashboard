@@ -5,6 +5,7 @@
 //   USG Reporting                    /usg/api/*,  /usg/activate,  collections usg*
 //   SMRG (Smart Medical Report Gen.) /smrg/api/*, /smrg/activate, collections smrg*
 //   SmartMed X-ray Report            /xray/api/*, /xray/activate, collections xray*
+//   SmartMed Display Hub             /displayhub/api/*, /displayhub/activate, collections displayhub*
 //
 // Every product has its OWN key pair, so nothing of one works for another. (X-ray was built from the USG app and
 // shared USG's keys up to version 1.0.7; from 1.0.8 it has its own, made 2026-10-10 — XRAY-License-Keys.)
@@ -85,6 +86,30 @@ export const PRODUCTS = {
     signTool: 'tools/sign-update.mjs',
     github: { ownerEnv: 'XRAY_GITHUB_OWNER', repoEnv: 'XRAY_GITHUB_REPO', tokenEnv: 'XRAY_GITHUB_TOKEN' },
     userAgent: 'xray-update-server',
+  },
+  displayhub: {
+    id: 'displayhub',
+    name: 'SmartMed Display Hub',
+    issuer: 'displayhub-license',
+    codePrefix: 'DHUB1',
+    // Firestore: displayhubDevices, displayhubEvents, displayhubConfig, displayhubResetRequests, displayhubDeletedDevices.
+    collectionPrefix: 'displayhub',
+    rateLimitPrefix: 'displayhub:',
+    licenceKeyEnv: 'DISPLAYHUB_LICENSE_PRIVATE_KEY',
+    licenceKeyHelp: 'Put the full text of license-private-key.pem (DISPLAYHUB-License-Keys folder) into DISPLAYHUB_LICENSE_PRIVATE_KEY, then redeploy.',
+    /** Same as LicenseToken.PublicKeySpki in the Display Hub (keys made 2026-10-20 — DISPLAYHUB-License-Keys). */
+    licencePublicKey:
+      'MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEtikv1GahWaXd208x1+WQ1gTB3aONfM9DTg9ctA3Hn6MtrZ1M5UNg2iPzd5Av5mUAGpFQRYzGIb07fd5drwB7xg==',
+    /** Same as UpdateSignature.PublicKeySpki in the Display Hub. */
+    updatePublicKey:
+      'MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEHNVVygOLL/5xt2eJm7ZXy5esbgz1Bxj7MM/wUuFXhpGuYH/9535QN44eIQySXVe0G6Cb6GOU1YXW7l4M6l4pEw==',
+    updateMessagePrefix: 'DHUBUPD1',
+    updateManifestFormat: 'displayhub-update-1',
+    // SmartMed-Display-Hub-<version>.zip + .zip.sig on each release.
+    packageExtension: '.zip',
+    signTool: 'tools/sign-update.mjs',
+    github: { ownerEnv: 'DISPLAYHUB_GITHUB_OWNER', repoEnv: 'DISPLAYHUB_GITHUB_REPO', tokenEnv: 'DISPLAYHUB_GITHUB_TOKEN' },
+    userAgent: 'displayhub-update-server',
   },
 };
 

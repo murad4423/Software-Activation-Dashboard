@@ -128,6 +128,46 @@
   to = "/.netlify/functions/xray-not-found"
   status = 404
 
+# ---------------------------------------------------------------------------
+# SmartMed Display Hub - everything under /displayhub/. Contract: docs/ACTIVATION_AND_UPDATE_PLAN.md in the Hub repository.
+# The public /displayhub/activate page (QR code -> phone) is served by the SPA fallback below.
+# ---------------------------------------------------------------------------
+[[redirects]]
+  from = "/displayhub/api/activate"
+  to = "/.netlify/functions/displayhub-activate"
+  status = 200
+
+[[redirects]]
+  from = "/displayhub/api/sync"
+  to = "/.netlify/functions/displayhub-sync"
+  status = 200
+
+[[redirects]]
+  from = "/displayhub/api/dev-reset-request"
+  to = "/.netlify/functions/displayhub-dev-reset-request"
+  status = 200
+
+[[redirects]]
+  from = "/displayhub/api/offline-activate"
+  to = "/.netlify/functions/displayhub-offline-activate"
+  status = 200
+
+[[redirects]]
+  from = "/displayhub/api/update"
+  to = "/.netlify/functions/displayhub-update"
+  status = 200
+
+[[redirects]]
+  from = "/displayhub/api/update/download"
+  to = "/.netlify/functions/displayhub-update-download"
+  status = 200
+
+# Anything else under /displayhub/api/ is a JSON 404, never the dashboard's HTML.
+[[redirects]]
+  from = "/displayhub/api/*"
+  to = "/.netlify/functions/displayhub-not-found"
+  status = 404
+
 # SPA fallback for the React dashboard (client-side routing)
 [[redirects]]
   from = "/*"
