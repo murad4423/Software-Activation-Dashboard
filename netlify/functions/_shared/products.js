@@ -6,6 +6,7 @@
 //   SMRG (Smart Medical Report Gen.) /smrg/api/*, /smrg/activate, collections smrg*
 //   SmartMed X-ray Report            /xray/api/*, /xray/activate, collections xray*
 //   SmartMed Display Hub             /displayhub/api/*, /displayhub/activate, collections displayhub*
+//   SmartMed Display Hub TV          /displayhubtv/api/*  (UPDATES ONLY — no licence, see its entry below)
 //
 // Every product has its OWN key pair, so nothing of one works for another. (X-ray was built from the USG app and
 // shared USG's keys up to version 1.0.7; from 1.0.8 it has its own, made 2026-10-10 — XRAY-License-Keys.)
@@ -110,6 +111,31 @@ export const PRODUCTS = {
     signTool: 'tools/sign-update.mjs',
     github: { ownerEnv: 'DISPLAYHUB_GITHUB_OWNER', repoEnv: 'DISPLAYHUB_GITHUB_REPO', tokenEnv: 'DISPLAYHUB_GITHUB_TOKEN' },
     userAgent: 'displayhub-update-server',
+  },
+  displayhubtv: {
+    id: 'displayhubtv',
+    name: 'SmartMed Display Hub TV',
+    /**
+     * UPDATES ONLY. The TV app is not licensed and never activates: it is an Android TV box screen that the Hub
+     * drives on the hospital LAN. So this product has no licence key, no activation, trial, offline activation or
+     * reset, and the admin function refuses every licence action for it. Its device records exist for one reason:
+     * the dashboard needs a row per TV so one of them can be marked "Test TV". The record is created by the first
+     * update check (updateHandler), not by an activation.
+     */
+    updatesOnly: true,
+    // Firestore: displayhubtvDevices, displayhubtvEvents, displayhubtvConfig.
+    collectionPrefix: 'displayhubtv',
+    rateLimitPrefix: 'displayhubtv:',
+    /** Same as UpdateSignature.PUBLIC_KEY_SPKI in the TV app (keys made 2026-11-12 — DISPLAYHUBTV-License-Keys). */
+    updatePublicKey:
+      'MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEQyLZ18ejY6Yf2i3Gq90UrksrxKUjprzLjsLSkvdYGYJQMmoV5+eXHgvtyF4wLQqevJ9mprBTEbgMTPOyqcAPVw==',
+    updateMessagePrefix: 'DHUBTVUPD1',
+    updateManifestFormat: 'displayhubtv-update-1',
+    // SmartMedDisplayHubTV-<version>.apk + .apk.sig on each release.
+    packageExtension: '.apk',
+    signTool: 'tools/sign-update.mjs',
+    github: { ownerEnv: 'DISPLAYHUBTV_GITHUB_OWNER', repoEnv: 'DISPLAYHUBTV_GITHUB_REPO', tokenEnv: 'DISPLAYHUBTV_GITHUB_TOKEN' },
+    userAgent: 'displayhubtv-update-server',
   },
 };
 

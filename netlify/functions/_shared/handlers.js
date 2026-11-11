@@ -133,12 +133,33 @@ export const offlineActivateHandler = (product) => async (request, context) => {
   }
 };
 
-// ----- POST /<app>/api/update  Body: { fingerprint, appVersion } -----
+/**
+ * The few facts an `updatesOnly` device (a TV) sends about itself, each one validated and cut to length. Nothing
+ * here identifies a hospital, a patient or a Hub: it is only what an operator needs to recognise a box in the list.
+ */
+function clientFacts(body, ip) {
+  const versionCode = Number(body.versionCode);
+  return {
+    versionCode: Number.isInteger(versionCode) && versionCode > 0 && versionCode < 1e9 ? versionCode : null,
+    model: String(body.model || '').slice(0, 60),
+    androidVersion: String(body.androidVersion || '').slice(0, 40),
+    lastIp: ip || null,
+    lastSeenAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  };
+}
+
+// ----- POST /<app>/api/update  Body: { fingerprint, appVersion } (+ versionCode, model, androidVersion for a TV) -----
 // Which version a PC is offered is decided in the dashboard (Updates), not by GitHub alone:
 //   - a "Test PC" (flag on its device record) gets the newest correctly signed release, pre-releases included;
 //   - every other PC gets the version marked "Released to all" — nothing while updates are paused or none is released.
 // Answer: { release: {version, name, publishedAt, notes, assetName, assetSize, sha256, signature, downloadUrl} }
 //      or { release: null, message }. The app itself compares versions and verifies the signature.
+//
+// An `updatesOnly` product (the TV app) has no activation, so there is no other moment at which its device record
+// could be created: the first check creates it here, which is what makes a TV appear in the dashboard so somebody
+// can mark it "Test TV". Nothing about the four licensed products changes — for them this stays an update of the
+// record that activation already made.
 export const updateHandler = (product) => async (request, context) => {
   if (request.method !== 'POST') return fail(405, 'invalid_request', 'Method not allowed.');
   const body = await readJson(request);
@@ -154,7 +175,23 @@ export const updateHandler = (product) => async (request, context) => {
     const config = configSnap.exists ? configSnap.data() : {};
     const isTest = deviceSnap.exists && deviceSnap.data().testDevice === true;
     if (deviceSnap.exists) {
-      await deviceSnap.ref.update({ appVersion: String(body.appVersion || '').slice(0, 30), lastUpdateCheckAt: serverTimestamp() });
+      await deviceSnap.ref.update({
+        appVersion: String(body.appVersion || '').slice(0, 30),
+        lastUpdateCheckAt: serverTimestamp(),
+        ...(product.updatesOnly ? clientFacts(body, ip) : {}),
+      });
+    } else if (product.updatesOnly) {
+      await collection(product, 'Devices').doc(fp).set({
+        fingerprint: fp,
+        appVersion: String(body.appVersion || '').slice(0, 30),
+        testDevice: false,
+        note: '',
+        firstSeenAt: serverTimestamp(),
+        createdAt: serverTimestamp(),
+        lastUpdateCheckAt: serverTimestamp(),
+        ...clientFacts(body, ip),
+      });
+      await logEvent(product, 'tv-first-seen', fp, { appVersion: String(body.appVersion || '').slice(0, 30) });
     }
     const releases = (await listReleases(product)).filter((r) => r.manifest);
     let target = null;
@@ -416,6 +453,13 @@ function adminActions(product) {
   };
 }
 
+/**
+ * What an `updatesOnly` product (the TV app) may be asked to do. Everything else — renew, setEnd, suspend,
+ * unsuspend, licence, approveReset, dismissReset, saveSettings — is a licence action, and this product has no
+ * licence and no licence key, so it is refused by name rather than failing somewhere deeper with a confusing error.
+ */
+const UPDATES_ONLY_ACTIONS = new Set(['releases', 'setReleased', 'setPaused', 'setTestDevice', 'setNote', 'deleteDevice']);
+
 export const adminHandler = (product) => {
   const actions = adminActions(product);
   return async (request) => {
@@ -431,6 +475,9 @@ export const adminHandler = (product) => {
     const body = (await readJson(request)) || {};
     const handler = Object.prototype.hasOwnProperty.call(actions, body.action) ? actions[body.action] : null;
     if (!handler) return bad('Unknown action.');
+    if (product.updatesOnly && !UPDATES_ONLY_ACTIONS.has(body.action)) {
+      return bad(`${product.name} has no licence, so "${body.action}" does not apply to it.`, 400);
+    }
 
     try {
       return await handler(body, admin);

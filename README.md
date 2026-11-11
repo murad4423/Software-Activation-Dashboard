@@ -59,9 +59,17 @@ counters, every app, live there).
 | `XRAY_GITHUB_OWNER` / `XRAY_GITHUB_REPO` / `XRAY_GITHUB_TOKEN` | `murad4423` / `SmartMed-X-Ray-Repoting-main-code` + token |
 | `DISPLAYHUB_LICENSE_PRIVATE_KEY` | text of `DocumentsDISPLAYHUB-License-Keyslicense-private-key.pem` (secret) |
 | `DISPLAYHUB_GITHUB_OWNER` / `DISPLAYHUB_GITHUB_REPO` / `DISPLAYHUB_GITHUB_TOKEN` | `murad4423` / `SmartMed-Display-Hub` + token |
+| `DISPLAYHUBTV_GITHUB_OWNER` / `DISPLAYHUBTV_GITHUB_REPO` / `DISPLAYHUBTV_GITHUB_TOKEN` | `murad4423` / `SmartMed-Display-Hub-TV` + token (the TV app's own private repo, where its releases are published) |
 
 The server checks each licence key against the app's public key and says exactly what is wrong if a key is missing,
 public, or the other app's. The **update-signing** private keys are NOT put into Netlify — they stay on the developer PC.
+
+**`displayhubtv` has no licence key, and must not be given one.** The Android TV app is not activated and has no
+trial or end date — a waiting-room screen is part of a Hub installation that is already licensed. It is an
+updates-only product (`products.js` → `updatesOnly: true`): only `/displayhubtv/api/update` and
+`/displayhubtv/api/update/download` exist, the admin function refuses every licence action for it by name, and its
+dashboard panel shows only **Updates** and **TVs**. A TV's record is created by its own first update check, which
+is what makes it appear in **TVs** so it can be marked *Test TV*.
 
 ## Deploy
 

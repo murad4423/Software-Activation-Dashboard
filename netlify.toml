@@ -168,6 +168,27 @@
   to = "/.netlify/functions/displayhub-not-found"
   status = 404
 
+# ---------------------------------------------------------------------------
+# SmartMed Display Hub TV (the Android TV app) - UPDATES ONLY, under /displayhubtv/.
+# It has no licence, so there is no activate, sync, offline-activate or dev-reset-request address for it.
+# Contract: docs/TV_PROTOCOL.md section "Online updates" in the TV app repository.
+# ---------------------------------------------------------------------------
+[[redirects]]
+  from = "/displayhubtv/api/update"
+  to = "/.netlify/functions/displayhubtv-update"
+  status = 200
+
+[[redirects]]
+  from = "/displayhubtv/api/update/download"
+  to = "/.netlify/functions/displayhubtv-update-download"
+  status = 200
+
+# Anything else under /displayhubtv/api/ is a JSON 404, never the dashboard's HTML.
+[[redirects]]
+  from = "/displayhubtv/api/*"
+  to = "/.netlify/functions/displayhubtv-not-found"
+  status = 404
+
 # SPA fallback for the React dashboard (client-side routing)
 [[redirects]]
   from = "/*"

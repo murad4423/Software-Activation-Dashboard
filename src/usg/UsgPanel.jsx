@@ -9,9 +9,14 @@ import { EVENT_TEXT, daysLeft, fmtDate, pcDisplayId, toDate, usgStatus } from '.
 // rules), changes everything through the app's <key>-admin function. Collections: <key>Devices, <key>ResetRequests,
 // <key>Events, <key>Config.
 
+/** A live collection. A null path means "this app does not have that collection" and yields an empty list. */
 function useCollection(path, ...constraints) {
   const [rows, setRows] = useState(null);
   useEffect(() => {
+    if (!path) {
+      setRows([]);
+      return undefined;
+    }
     const q = query(collection(db, path), ...constraints);
     return onSnapshot(q, (snap) => setRows(snap.docs.map((d) => ({ id: d.id, ...d.data() }))), () => setRows([]));
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -460,6 +465,9 @@ function UpdatesTab({ devices }) {
   const [data, setData] = useState(null);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState('');
+  // The TV app has no licence and no hospitals: the same screen, with "TV" wherever it says "PC".
+  const unit = app.updatesOnly ? 'TV' : 'PC';
+  const units = app.updatesOnly ? 'TVs' : 'PCs';
 
   async function load(fresh) {
     setError('');
@@ -504,7 +512,7 @@ function UpdatesTab({ devices }) {
         <div>
           <h2>Updates ({app.name})</h2>
           <p className="muted">
-            Releases come from GitHub {data ? <code>{data.repo}</code> : ''}. Customers get ONLY the version you release here; test PCs get the newest signed release (pre-releases too).
+            Releases come from GitHub {data ? <code>{data.repo}</code> : ''}. Customers get ONLY the version you release here; test {units} get the newest signed release (pre-releases too).
           </p>
         </div>
         <button className="secondary" disabled={!!busy} onClick={() => load(true)}>{busy === 'load' ? 'Loading…' : 'Refresh from GitHub'}</button>
@@ -517,14 +525,14 @@ function UpdatesTab({ devices }) {
           <span className="stat-label">Update delivery</span>
           <span className="stat-value">{config.paused ? 'Paused' : 'On'}</span>
         </div>
-        <div className="stat-card"><span className="stat-label">Test PCs</span><span className="stat-value">{testPcs.length}</span></div>
+        <div className="stat-card"><span className="stat-label">Test {units}</span><span className="stat-value">{testPcs.length}</span></div>
       </div>
 
       <div className="card-actions">
         {config.paused ? (
           <button disabled={!!busy} onClick={() => act('pause', 'setPaused', { paused: false })}>Resume updates</button>
         ) : (
-          <button className="danger" disabled={!!busy} onClick={() => act('pause', 'setPaused', { paused: true }, 'Pause updates? No customer PC will be offered an update until you resume (test PCs still are).')}>Pause all updates</button>
+          <button className="danger" disabled={!!busy} onClick={() => act('pause', 'setPaused', { paused: true }, `Pause updates? No customer ${unit} will be offered an update until you resume (test ${units} still are).`)}>Pause all updates</button>
         )}
         {released && <button className="secondary" disabled={!!busy} onClick={() => act('withdraw', 'setReleased', { version: '' }, `Withdraw ${released}? Customers will not be offered any update until you release one again.`)}>Withdraw released version</button>}
       </div>
@@ -549,7 +557,7 @@ function UpdatesTab({ devices }) {
                       {!r.manifest && <div className="muted small">{r.problem}</div>}</td>
                     <td>
                       {isReleased ? <span className="status status-success">Live for all</span> : (
-                        <button disabled={!!busy || !r.manifest || r.prerelease} onClick={() => act(`rel-${r.id}`, 'setReleased', { version: r.version }, `Release ${r.version} to ALL customer PCs?\n\nTip: try it on a test PC first.`)}>
+                        <button disabled={!!busy || !r.manifest || r.prerelease} onClick={() => act(`rel-${r.id}`, 'setReleased', { version: r.version }, `Release ${r.version} to ALL customer ${units}?\n\nTip: try it on a test ${unit} first.`)}>
                           {busy === `rel-${r.id}` ? 'Working…' : 'Release to all'}
                         </button>
                       )}
@@ -566,14 +574,139 @@ function UpdatesTab({ devices }) {
       <div className="usg-two-col">
         <div>
           <h3 className="usg-subhead">Versions in use</h3>
-          <ul className="usg-history">{versions.map(([v, n]) => <li key={v}><strong>{v}</strong> · {n} PC{n > 1 ? 's' : ''}</li>)}</ul>
+          <ul className="usg-history">{versions.map(([v, n]) => <li key={v}><strong>{v}</strong> · {n} {unit}{n > 1 ? 's' : ''}</li>)}</ul>
         </div>
         <div>
-          <h3 className="usg-subhead">Test PCs</h3>
-          {testPcs.length === 0 ? <p className="muted small">None. Mark a PC as "Test PC" in its row on the Hospitals / PCs tab.</p> : (
-            <ul className="usg-history">{testPcs.map((d) => <li key={d.id}>{d.hospitalName} · {pcDisplayId(d.fingerprint)} · {d.appVersion || '—'}</li>)}</ul>
+          <h3 className="usg-subhead">Test {units}</h3>
+          {testPcs.length === 0 ? (
+            <p className="muted small">None. Mark a {unit} as "Test {unit}" in its row on the {app.updatesOnly ? 'TVs' : 'Hospitals / PCs'} tab.</p>
+          ) : (
+            <ul className="usg-history">{testPcs.map((d) => <li key={d.id}>{d.hospitalName || d.model || 'TV'} · {pcDisplayId(d.fingerprint)} · {d.appVersion || '—'}</li>)}</ul>
           )}
         </div>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------------------------------------------
+// TVs — the whole "Hospitals / PCs" tab of an updates-only app. A TV has no hospital, no licence and no end date:
+// a row is created by the TV's first online update check, and the only things to do with it are "Test TV", a note
+// and forgetting it. Forgetting is safe: the next check creates the row again, only without the Test TV flag.
+// ---------------------------------------------------------------------------------------------------------------
+
+function TvsTab({ devices }) {
+  const app = useApp();
+  const [search, setSearch] = useState('');
+  const [busy, setBusy] = useState('');
+  const [error, setError] = useState('');
+
+  async function act(name, action, fields, confirmText) {
+    if (confirmText && !window.confirm(confirmText)) return;
+    setBusy(name);
+    setError('');
+    try {
+      await appAdmin(app, action, fields);
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setBusy('');
+    }
+  }
+
+  const rows = useMemo(() => {
+    const s = search.trim().toLowerCase();
+    const list = (devices || []).filter((d) =>
+      !s || [d.model, d.appVersion, d.androidVersion, d.note, d.fingerprint, pcDisplayId(d.fingerprint)]
+        .filter(Boolean)
+        .some((v) => String(v).toLowerCase().includes(s))
+    );
+    return [...list].sort((a, b) => (toDate(b.lastUpdateCheckAt)?.getTime() ?? 0) - (toDate(a.lastUpdateCheckAt)?.getTime() ?? 0));
+  }, [devices, search]);
+
+  const testCount = (devices || []).filter((d) => d.testDevice).length;
+
+  return (
+    <div>
+      <div className="section-head">
+        <div>
+          <h2>{app.name}: TVs</h2>
+          <p className="muted">
+            One row per TV, created by that TV's first online update check (every ~6 hours). A TV with no internet
+            never appears here and is updated from the Hub over the LAN instead.
+          </p>
+        </div>
+      </div>
+      {error && <div className="error">{error}</div>}
+
+      <div className="stat-grid usg-stat-3">
+        <div className="stat-card stat-info"><span className="stat-label">TVs checking in</span><span className="stat-value">{(devices || []).length}</span></div>
+        <div className="stat-card"><span className="stat-label">Test TVs</span><span className="stat-value">{testCount}</span></div>
+        <div className="stat-card"><span className="stat-label">Seen in the last 24 h</span>
+          <span className="stat-value">
+            {(devices || []).filter((d) => (toDate(d.lastUpdateCheckAt)?.getTime() ?? 0) > Date.now() - 86400000).length}
+          </span>
+        </div>
+      </div>
+
+      <div className="toolbar">
+        <input className="search-input" type="search" placeholder="Search model, version, TV id, note…" value={search} onChange={(e) => setSearch(e.target.value)} />
+        <span className="muted small">{rows.length} of {(devices || []).length} shown</span>
+      </div>
+
+      <div className="table-wrap">
+        <table className="table">
+          <thead>
+            <tr><th>TV</th><th>Model</th><th>Version</th><th>Android</th><th>Last check</th><th>Note</th><th></th></tr>
+          </thead>
+          <tbody>
+            {rows.map((d) => (
+              <tr key={d.id}>
+                <td><CopyChip value={pcDisplayId(d.fingerprint)} label="copy" />{d.testDevice && <div><span className="badge">Test TV</span></div>}</td>
+                <td className="small">{d.model || '—'}</td>
+                <td className="small"><strong>{d.appVersion || '—'}</strong>{d.versionCode ? <span className="muted"> ({d.versionCode})</span> : null}</td>
+                <td className="small">{d.androidVersion || '—'}</td>
+                <td className="small">{fmtDate(d.lastUpdateCheckAt, true)}</td>
+                <td className="small">{d.note || '—'}</td>
+                <td>
+                  <div className="card-actions">
+                    <button
+                      className="secondary"
+                      disabled={!!busy}
+                      onClick={() => act(`test-${d.id}`, 'setTestDevice', { fingerprint: d.fingerprint, value: !d.testDevice },
+                        d.testDevice ? null : 'Make this a Test TV?\n\nIt will be offered the newest signed release, pre-releases included, before every other TV.')}
+                    >
+                      {busy === `test-${d.id}` ? 'Working…' : d.testDevice ? 'Stop testing' : 'Make Test TV'}
+                    </button>
+                    <button
+                      className="secondary"
+                      disabled={!!busy}
+                      onClick={() => {
+                        const note = window.prompt('Note for this TV (which ward, which room):', d.note || '');
+                        if (note !== null) act(`note-${d.id}`, 'setNote', { fingerprint: d.fingerprint, note });
+                      }}
+                    >
+                      Note
+                    </button>
+                    <button
+                      className="danger"
+                      disabled={!!busy}
+                      onClick={() => act(`del-${d.id}`, 'deleteDevice', { fingerprint: d.fingerprint },
+                        'Forget this TV?\n\nIts next update check creates the row again, without the Test TV flag. Nothing on the TV changes.')}
+                    >
+                      Forget
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+            {rows.length === 0 && (
+              <tr><td colSpan={7} className="empty-state">
+                No TV has checked for an online update yet. A TV on 1.6.1 or older has no online updater — install 1.7.0 on it first.
+              </td></tr>
+            )}
+          </tbody>
+        </table>
       </div>
     </div>
   );
@@ -664,10 +797,27 @@ function SettingsTab() {
 
 function PanelBody() {
   const app = useApp();
-  const [tab, setTab] = useState('devices');
+  // An updates-only app (the TV) has no licences, no trials and no reset requests, so it opens on Updates and
+  // shows only those two tabs. Nothing licence-related is rendered for it at all.
+  const [tab, setTab] = useState(app.updatesOnly ? 'updates' : 'devices');
   const devices = useCollection(`${app.key}Devices`, orderBy('createdAt', 'desc'));
-  const resets = useCollection(`${app.key}ResetRequests`, orderBy('createdAt', 'desc'), limit(100));
+  const resets = useCollection(app.updatesOnly ? null : `${app.key}ResetRequests`, orderBy('createdAt', 'desc'), limit(100));
   const pendingResets = (resets || []).filter((r) => r.status === 'pending').length;
+
+  if (app.updatesOnly) {
+    return (
+      <>
+        <nav className="tabs">
+          <button className={tab === 'updates' ? 'active' : ''} onClick={() => setTab('updates')}>Updates</button>
+          <button className={tab === 'tvs' ? 'active' : ''} onClick={() => setTab('tvs')}>TVs</button>
+        </nav>
+        <main>
+          {tab === 'updates' && <UpdatesTab devices={devices} />}
+          {tab === 'tvs' && <TvsTab devices={devices} />}
+        </main>
+      </>
+    );
+  }
 
   return (
     <>
