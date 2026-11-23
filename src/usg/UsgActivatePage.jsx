@@ -79,6 +79,8 @@ export default function UsgActivatePage({ app }) {
   }
 
   const expires = result ? new Date(result.expiresAt) : null;
+  const unit = app.unit || 'PC';
+  const isTv = unit === 'TV';
 
   return (
     <div className="login-wrap usg-activate">
@@ -87,12 +89,12 @@ export default function UsgActivatePage({ app }) {
         <div className="muted usg-activate-facts">
           <div><strong>Hospital / Clinic:</strong> {data.hospital.hospitalName || '-'}</div>
           {data.hospital.phone && <div><strong>Phone:</strong> {data.hospital.phone}</div>}
-          <div><strong>PC:</strong> {data.machineName || '-'} ({data.pcId})</div>
+          <div><strong>{unit}:</strong> {data.machineName || '-'} ({data.pcId})</div>
         </div>
 
         {state !== 'done' && (
           <>
-            <p className="muted">Tap the button to get the activation code for this PC. A new PC starts with a free trial; a PC that is already registered gets its current licence (use this to renew a PC that has no internet).</p>
+            <p className="muted">Tap the button to get the activation for this {unit}. A new {unit} starts with a free trial; a {unit} that is already registered gets its current licence (use this to renew a {unit} that has no internet).</p>
             <button onClick={activate} disabled={state === 'working'}>
               {state === 'working' ? 'Getting the code...' : 'Get Activation Code'}
             </button>
@@ -106,15 +108,22 @@ export default function UsgActivatePage({ app }) {
               <span className={`status status-${result.status === 'suspended' ? 'danger' : 'success'}`}>{STATUS_TEXT[result.status] || result.status}</span>
               <span className="muted">valid until {expires.toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })}</span>
             </div>
-            <p className="muted">On the PC: Offline Activation, then type this code:</p>
-            <div className="usg-code" aria-label="Activation code">{result.code}</div>
-            <button
-              className="secondary"
-              onClick={() => navigator.clipboard.writeText(result.code).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000); })}
-            >
-              {copied ? 'Copied!' : 'Copy Code'}
-            </button>
-            <p className="muted">Or download the licence file and import it on the PC ("Import licence file..."):</p>
+            {isTv ? (
+              // A TV remote cannot type a code this long: the licence file goes to the TV on a USB stick.
+              <p className="muted">Download the licence file, copy it to a USB pen drive, plug the pen drive into the TV and choose "Import licence file from USB" on the activation screen.</p>
+            ) : (
+              <>
+                <p className="muted">On the PC: Offline Activation, then type this code:</p>
+                <div className="usg-code" aria-label="Activation code">{result.code}</div>
+                <button
+                  className="secondary"
+                  onClick={() => navigator.clipboard.writeText(result.code).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000); })}
+                >
+                  {copied ? 'Copied!' : 'Copy Code'}
+                </button>
+                <p className="muted">Or download the licence file and import it on the PC ("Import licence file..."):</p>
+              </>
+            )}
             <button onClick={() => downloadLicence(app, result.token, result.hospitalName)}>Download Licence File</button>
           </>
         )}

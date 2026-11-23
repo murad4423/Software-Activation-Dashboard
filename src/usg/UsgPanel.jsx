@@ -466,8 +466,8 @@ function UpdatesTab({ devices }) {
   const [error, setError] = useState('');
   const [busy, setBusy] = useState('');
   // The TV app has no licence and no hospitals: the same screen, with "TV" wherever it says "PC".
-  const unit = app.updatesOnly ? 'TV' : 'PC';
-  const units = app.updatesOnly ? 'TVs' : 'PCs';
+  const unit = app.updatesOnly ? 'TV' : app.unit || 'PC';
+  const units = `${unit}s`;
 
   async function load(fresh) {
     setError('');

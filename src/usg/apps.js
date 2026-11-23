@@ -35,6 +35,17 @@ export const APPS = {
     resetFlag: '--displayhub-dev-license-reset',
     licenceFileExtension: 'dhublicense',
   },
+  // The Android TV eye-chart app. Licensed exactly like the desktop apps, but a TV: offline activation is the
+  // licence file (phone -> USB stick -> TV), because a code this long cannot be typed with a remote.
+  visionchart: {
+    key: 'visionchart',
+    mark: 'VISION',
+    name: 'SmartMed Vision Chart',
+    fullName: 'SmartMed Vision Chart (Android TV)',
+    resetFlag: '(developer reset in the TV app)',
+    licenceFileExtension: 'vclicense',
+    unit: 'TV',
+  },
   // The Android TV app. It is not licensed and never activates — the Hub drives it on the hospital LAN — so this
   // panel shows only Updates and the list of TVs. Its records are created by the TVs' own update checks.
   displayhubtv: {

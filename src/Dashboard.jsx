@@ -6,7 +6,7 @@ import LicencePanel from './usg/UsgPanel.jsx';
 
 // All the desktop apps (SMRG, USG Reporting, X-ray and the Display Hub) use the same licence system; the switch picks
 // the one shown. The TV app is on the end: same update system, no licence (apps.js -> updatesOnly).
-const PRODUCTS = [APPS.smrg, APPS.usg, APPS.xray, APPS.displayhub, APPS.displayhubtv];
+const PRODUCTS = [APPS.smrg, APPS.usg, APPS.xray, APPS.displayhub, APPS.visionchart, APPS.displayhubtv];
 
 function readProduct() {
   try {

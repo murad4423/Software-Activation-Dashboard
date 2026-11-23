@@ -137,6 +137,36 @@ export const PRODUCTS = {
     github: { ownerEnv: 'DISPLAYHUBTV_GITHUB_OWNER', repoEnv: 'DISPLAYHUBTV_GITHUB_REPO', tokenEnv: 'DISPLAYHUBTV_GITHUB_TOKEN' },
     userAgent: 'displayhubtv-update-server',
   },
+  visionchart: {
+    id: 'visionchart',
+    name: 'SmartMed Vision Chart',
+    /**
+     * The Android TV eye-chart app. Unlike the Display Hub TV app it IS licensed: it works on its own (no Hub), so
+     * it activates exactly like the desktop apps — new TV -> trial, renew / suspend in the dashboard, sync every
+     * 12 h, offline activation through the /visionchart/activate phone page (licence file, imported from USB).
+     * Contract: docs/LICENSE_AND_UPDATES.md in the Vision Chart repository.
+     */
+    issuer: 'visionchart-license',
+    codePrefix: 'VCHART1',
+    // Firestore: visionchartDevices, visionchartEvents, visionchartConfig, visionchartResetRequests, visionchartDeletedDevices.
+    collectionPrefix: 'visionchart',
+    rateLimitPrefix: 'visionchart:',
+    licenceKeyEnv: 'VISIONCHART_LICENSE_PRIVATE_KEY',
+    licenceKeyHelp: 'Put the full text of license-private-key.pem (VISIONCHART-License-Keys folder) into VISIONCHART_LICENSE_PRIVATE_KEY, then redeploy.',
+    /** Same as LicenceToken.PUBLIC_KEY_SPKI in the Vision Chart app (keys made 2026-11-23 — VISIONCHART-License-Keys). */
+    licencePublicKey:
+      'MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEpi1mvmMlo2WTei+E4IfvDGsD3fnCbgOteJalPzwTh8jTqWNcDv19WaqmBAdCmsEDD87ApU+K0kwABKq+LNKomQ==',
+    /** Same as UpdateSignature.PUBLIC_KEY_SPKI in the Vision Chart app. */
+    updatePublicKey:
+      'MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAErN2p45QAFNtYUwHQl8tAOy1bf6K7bM2ME9gfGTrkrDY5eZrMVz0cUgq8O4rssa6aP9ZIvY6jzn3j8Vj+kAiP6Q==',
+    updateMessagePrefix: 'VCHARTUPD1',
+    updateManifestFormat: 'visionchart-update-1',
+    // SmartMedVisionChart-<version>.apk + .apk.sig on each release.
+    packageExtension: '.apk',
+    signTool: 'tools/sign-update.mjs',
+    github: { ownerEnv: 'VISIONCHART_GITHUB_OWNER', repoEnv: 'VISIONCHART_GITHUB_REPO', tokenEnv: 'VISIONCHART_GITHUB_TOKEN' },
+    userAgent: 'visionchart-update-server',
+  },
 };
 
 /** Firestore collection of a product, e.g. collection(PRODUCTS.smrg, 'Devices') -> "smrgDevices". */

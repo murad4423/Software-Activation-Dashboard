@@ -189,6 +189,47 @@
   to = "/.netlify/functions/displayhubtv-not-found"
   status = 404
 
+# ---------------------------------------------------------------------------
+# SmartMed Vision Chart (Android TV eye chart) - everything under /visionchart/. Licensed like the desktop apps.
+# Contract: docs/LICENSE_AND_UPDATES.md in the Vision Chart repository.
+# The public /visionchart/activate page (QR code on the TV -> phone) is served by the SPA fallback below.
+# ---------------------------------------------------------------------------
+[[redirects]]
+  from = "/visionchart/api/activate"
+  to = "/.netlify/functions/visionchart-activate"
+  status = 200
+
+[[redirects]]
+  from = "/visionchart/api/sync"
+  to = "/.netlify/functions/visionchart-sync"
+  status = 200
+
+[[redirects]]
+  from = "/visionchart/api/dev-reset-request"
+  to = "/.netlify/functions/visionchart-dev-reset-request"
+  status = 200
+
+[[redirects]]
+  from = "/visionchart/api/offline-activate"
+  to = "/.netlify/functions/visionchart-offline-activate"
+  status = 200
+
+[[redirects]]
+  from = "/visionchart/api/update"
+  to = "/.netlify/functions/visionchart-update"
+  status = 200
+
+[[redirects]]
+  from = "/visionchart/api/update/download"
+  to = "/.netlify/functions/visionchart-update-download"
+  status = 200
+
+# Anything else under /visionchart/api/ is a JSON 404, never the dashboard's HTML.
+[[redirects]]
+  from = "/visionchart/api/*"
+  to = "/.netlify/functions/visionchart-not-found"
+  status = 404
+
 # SPA fallback for the React dashboard (client-side routing)
 [[redirects]]
   from = "/*"

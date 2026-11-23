@@ -8,9 +8,10 @@ Netlify Functions backend + React admin dashboard for the desktop apps that use 
 | **USG Reporting** | `/usg/api/*`, `/usg/activate` | `usg*` | `usg-reporting-main-code` |
 | **SmartMed X-ray Report** | `/xray/api/*`, `/xray/activate` | `xray*` | `SmartMed-X-Ray-Repoting-main-code` |
 | **SmartMed Display Hub** | `/displayhub/api/*`, `/displayhub/activate` | `displayhub*` | `SmartMed-Display-Hub` |
+| **SmartMed Vision Chart** (Android TV) | `/visionchart/api/*`, `/visionchart/activate` | `visionchart*` | `SmartMed-Vision-Chart` |
 
 Each app has its own licence key, update-signing key, collections and GitHub releases, so a licence for one never
-works in another. The dashboard's **OPTI | USG | XRAY | HUB** switch
+works in another. The dashboard's **OPTI | USG | XRAY | HUB | VISION | TV** switch
 picks the app; all of them get the same tabs: Hospitals / PCs
 (renew +N months, exact end date, suspend, notes, test PC, licence code, forget PC), Reset requests, Updates
 (signed releases, "Release to all", pause), Activity and Settings (trial length).
@@ -59,6 +60,8 @@ counters, every app, live there).
 | `XRAY_GITHUB_OWNER` / `XRAY_GITHUB_REPO` / `XRAY_GITHUB_TOKEN` | `murad4423` / `SmartMed-X-Ray-Repoting-main-code` + token |
 | `DISPLAYHUB_LICENSE_PRIVATE_KEY` | text of `DocumentsDISPLAYHUB-License-Keyslicense-private-key.pem` (secret) |
 | `DISPLAYHUB_GITHUB_OWNER` / `DISPLAYHUB_GITHUB_REPO` / `DISPLAYHUB_GITHUB_TOKEN` | `murad4423` / `SmartMed-Display-Hub` + token |
+| `VISIONCHART_LICENSE_PRIVATE_KEY` | text of `Related File\Licence Key\VISIONCHART-License-Keys\license-private-key.pem` (secret) |
+| `VISIONCHART_GITHUB_OWNER` / `VISIONCHART_GITHUB_REPO` / `VISIONCHART_GITHUB_TOKEN` | `murad4423` / the Vision Chart releases repo + token ("Contents: Read-only") |
 | `DISPLAYHUBTV_GITHUB_OWNER` / `DISPLAYHUBTV_GITHUB_REPO` / `DISPLAYHUBTV_GITHUB_TOKEN` | `murad4423` / `SmartMed-Display-Hub-TV` + token (the TV app's own private repo, where its releases are published) |
 
 The server checks each licence key against the app's public key and says exactly what is wrong if a key is missing,
